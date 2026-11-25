@@ -2,23 +2,22 @@
   <div>
     <el-card>
       <h3>智能匹配</h3>
+      <p class="tip">
+        <template v-if="auth.isEnterprise">
+          企业方向：用你最新发布的职位匹配所有求职者；可输入职位 ID（留空则用你最新发布的职位）。
+        </template>
+        <template v-else>
+          求职者方向：用你最新一份简历匹配所有职位。
+        </template>
+      </p>
       <el-form inline>
-        <el-form-item label="匹配方向">
-          <el-radio-group v-model="direction">
-            <el-radio value="seeker_to_jobs">求职者 → 职位</el-radio>
-            <el-radio value="enterprise_to_seekers">企业 → 求职者</el-radio>
-          </el-radio-group>
+        <el-form-item v-if="auth.isEnterprise" label="职位 ID（留空用最新）">
+          <el-input-number v-model="targetId" :min="1" />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" :loading="loading" @click="run">开始匹配</el-button>
         </el-form-item>
       </el-form>
-      <p class="tip">
-        求职者方向用你最新一份简历匹配所有职位；企业方向可输入职位 ID（留空则用你最新发布的职位）。
-      </p>
-      <el-form-item v-if="direction === 'enterprise_to_seekers'" label="职位 ID（留空用最新）">
-        <el-input-number v-model="targetId" :min="1" />
-      </el-form-item>
     </el-card>
 
     <el-card style="margin-top: 16px">
@@ -63,11 +62,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import client from '../api/client'
+import { useAuthStore } from '../stores/auth'
 
-const direction = ref<'seeker_to_jobs' | 'enterprise_to_seekers'>('seeker_to_jobs')
+const auth = useAuthStore()
+// 匹配方向跟随账号角色，不再由用户选择
+const direction = computed<'seeker_to_jobs' | 'enterprise_to_seekers'>(() =>
+  auth.isEnterprise ? 'enterprise_to_seekers' : 'seeker_to_jobs',
+)
 const targetId = ref<number | undefined>(undefined)
 const loading = ref(false)
 const results = ref<any[]>([])
@@ -77,7 +81,7 @@ async function run() {
   try {
     const { data } = await client.post('/match', {
       direction: direction.value,
-      target_id: direction.value === 'enterprise_to_seekers' ? targetId.value ?? null : null,
+      target_id: auth.isEnterprise ? targetId.value ?? null : null,
     })
     results.value = data.results
     ElMessage.success(`匹配完成，${data.results.length} 条结果`)

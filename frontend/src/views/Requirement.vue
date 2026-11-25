@@ -2,16 +2,13 @@
   <div>
     <el-card>
       <h3>需求卡抽取</h3>
-      <p class="tip">粘贴 JD 或简历/自述原文，抽取成结构化需求卡预览（供校对后合并进卡）。</p>
+      <p class="tip">粘贴 {{ roleLabel }} 原文，抽取成结构化需求卡预览（供校对后合并进卡）。</p>
       <el-form label-width="90px">
         <el-form-item label="对象类型">
-          <el-radio-group v-model="role">
-            <el-radio value="seeker">求职者（简历/自述）</el-radio>
-            <el-radio value="enterprise">企业（JD）</el-radio>
-          </el-radio-group>
+          <el-tag>{{ roleLabel }}</el-tag>
         </el-form-item>
         <el-form-item label="原文">
-          <el-input v-model="rawText" type="textarea" :rows="6" placeholder="粘贴 JD 或简历/自述原文" />
+          <el-input v-model="rawText" type="textarea" :rows="6" :placeholder="`粘贴 ${roleLabel} 原文`" />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" :loading="loading" @click="parse">抽取</el-button>
@@ -59,11 +56,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import client from '../api/client'
+import { useAuthStore } from '../stores/auth'
 
-const role = ref<'seeker' | 'enterprise'>('seeker')
+const auth = useAuthStore()
+// 对象类型跟随账号角色，不再由用户选择
+const role = computed<'seeker' | 'enterprise'>(() => (auth.isEnterprise ? 'enterprise' : 'seeker'))
+const roleLabel = computed(() => (role.value === 'enterprise' ? '企业（JD）' : '求职者（简历/自述）'))
 const rawText = ref('')
 const loading = ref(false)
 const applying = ref(false)

@@ -30,5 +30,12 @@ def create_job(
 
 
 @router.get("", response_model=list[JobOut])
-def list_jobs(db: Session = Depends(get_db)):
-    return db.query(Job).options(selectinload(Job.company)).order_by(Job.id.desc()).all()
+def list_jobs(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """求职者看全部职位；企业只看自己发布的职位。"""
+    q = db.query(Job).options(selectinload(Job.company))
+    if user.role == "enterprise":
+        q = q.filter(Job.owner_id == user.id)
+    return q.order_by(Job.id.desc()).all()

@@ -119,6 +119,22 @@ class Resume(Base):
     )
 
 
+class Application(Base):
+    """投递记录：求职者用某份简历投递某岗位（企业视角据此筛选「投了本公司岗位」的简历）。"""
+
+    __tablename__ = "applications"
+    __table_args__ = (UniqueConstraint("job_id", "resume_id", name="uq_application_job_resume"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_id: Mapped[int] = mapped_column(Integer, ForeignKey("jobs.id"), index=True)
+    resume_id: Mapped[int] = mapped_column(Integer, ForeignKey("resumes.id"), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="待处理")  # 待处理|已查看|面试|录用|拒绝
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+
 class RequirementCardRecord(Base):
     """需求卡落库：role + ref_id 指向 job/resume，card 存完整 hard/soft/facts。"""
 

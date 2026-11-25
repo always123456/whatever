@@ -22,6 +22,18 @@
       <el-table-column label="远程">
         <template #default="{ row }">{{ row.remote ? '支持' : '—' }}</template>
       </el-table-column>
+      <el-table-column v-if="!auth.isEnterprise" label="操作" width="120">
+        <template #default="{ row }">
+          <el-button
+            size="small"
+            :type="appliedJobIds.has(row.id) ? 'info' : 'primary'"
+            :disabled="appliedJobIds.has(row.id)"
+            @click="apply(row)"
+          >
+            {{ appliedJobIds.has(row.id) ? '已投递' : '投递' }}
+          </el-button>
+        </template>
+      </el-table-column>
     </el-table>
 
     <el-dialog v-model="dialog" title="发布职位" width="640px">
@@ -109,6 +121,7 @@ const jobs = ref<any[]>([])
 const dialog = ref(false)
 const skillsText = ref('')
 const mustSkillsText = ref('')
+const appliedJobIds = ref<Set<number>>(new Set())
 
 // 枚举与后端 schemas/requirement.py 常量保持一致
 const JOB_TYPES = ['社招', '应届校招', '实习生', '兼职']
@@ -166,6 +179,26 @@ async function load() {
   jobs.value = data
 }
 
+async function loadApplications() {
+  if (auth.isEnterprise) return
+  try {
+    const { data } = await client.get('/applications')
+    appliedJobIds.value = new Set(data.map((a: any) => a.job_id))
+  } catch (e: any) {
+    ElMessage.error(e.message)
+  }
+}
+
+async function apply(row: any) {
+  try {
+    await client.post('/applications', { job_id: row.id })
+    ElMessage.success(`已投递「${row.title}」`)
+    loadApplications()
+  } catch (e: any) {
+    ElMessage.error(e.message)
+  }
+}
+
 async function loadCompany() {
   if (!auth.isEnterprise) return
   try {
@@ -214,6 +247,7 @@ async function create() {
 onMounted(() => {
   load()
   loadCompany()
+  loadApplications()
 })
 </script>
 
