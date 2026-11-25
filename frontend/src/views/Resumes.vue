@@ -18,7 +18,7 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="dialog" title="创建简历" width="520px">
+    <el-dialog v-model="dialog" title="创建简历" width="640px">
       <el-form label-width="100px">
         <el-form-item label="姓名"><el-input v-model="form.name" /></el-form-item>
         <el-form-item label="地点"><el-input v-model="form.location" /></el-form-item>
@@ -36,6 +36,23 @@
           <el-select v-model="form.job_status">
             <el-option v-for="s in JOB_STATUSES" :key="s" :label="s" :value="s" />
           </el-select>
+        </el-form-item>
+        <el-form-item label="意向职位(逗号分隔,最多5个)"><el-input v-model="intendedTitlesText" /></el-form-item>
+        <el-form-item label="求职意向岗位类型">
+          <el-select v-model="form.target_job_types" multiple placeholder="可多选">
+            <el-option v-for="t in JOB_TYPES" :key="t" :label="t" :value="t" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="人才特质自评">
+          <div class="trait-grid">
+            <div v-for="t in TRAITS" :key="t.id" class="trait-item">
+              <span class="trait-name">{{ t.name }}</span>
+              <el-select v-model="selfTraitLevels[t.id]" size="small" style="width: 76px">
+                <el-option label="未填" value="" />
+                <el-option v-for="lv in TRAIT_LEVELS" :key="lv" :label="lv" :value="lv" />
+              </el-select>
+            </div>
+          </div>
         </el-form-item>
         <el-form-item label="可远程"><el-switch v-model="form.willing_remote" /></el-form-item>
         <el-form-item label="简介"><el-input v-model="form.summary" type="textarea" /></el-form-item>
@@ -58,9 +75,22 @@ const auth = useAuthStore()
 const resumes = ref<any[]>([])
 const dialog = ref(false)
 const skillsText = ref('')
+const intendedTitlesText = ref('')
 
-// 枚举与后端 schemas/requirement.py JOB_STATUSES 保持一致
+// 枚举与后端 schemas/requirement.py 常量保持一致
 const JOB_STATUSES = ['随时到岗', '本月到岗', '观望了解']
+const JOB_TYPES = ['社招', '应届校招', '实习生', '兼职']
+const TRAIT_LEVELS = ['弱', '中', '强']
+// 人才特质 12 项（TALENT_TRAITS，与 Jobs.vue 一致）
+const TRAITS = [
+  { id: 'C1', name: '结构化' }, { id: 'C2', name: '判断力' }, { id: 'C3', name: '学习迁移' },
+  { id: 'A1', name: '主动性' }, { id: 'A2', name: '交付' }, { id: 'A3', name: '韧性' },
+  { id: 'S1', name: '表达' }, { id: 'S2', name: '澄清' }, { id: 'S3', name: '冲突' },
+  { id: 'M1', name: '成就驱动' }, { id: 'M2', name: '稳定性' }, { id: 'M3', name: '价值取向' },
+]
+const selfTraitLevels = reactive<Record<string, string>>(
+  Object.fromEntries(TRAITS.map((t) => [t.id, ''])),
+)
 
 const form = reactive({
   name: '',
@@ -73,6 +103,7 @@ const form = reactive({
   willing_remote: false,
   summary: '',
   job_status: '',
+  target_job_types: [] as string[],
 })
 
 function salary(row: any) {
@@ -92,6 +123,11 @@ async function create() {
     await client.post('/resumes', {
       ...form,
       skills: skillsText.value.split(/[,，、]/).map((s) => s.trim()).filter(Boolean),
+      intended_titles: intendedTitlesText.value.split(/[,，、]/).map((s) => s.trim()).filter(Boolean).slice(0, 5),
+      self_traits: TRAITS.filter((t) => selfTraitLevels[t.id] !== '').map((t) => ({
+        dimension: t.id,
+        value: selfTraitLevels[t.id],
+      })),
     })
     ElMessage.success('已创建')
     dialog.value = false
@@ -106,6 +142,17 @@ onMounted(load)
 
 <style scoped>
 .toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.trait-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 16px;
+  width: 100%;
+}
+.trait-item {
   display: flex;
   justify-content: space-between;
   align-items: center;

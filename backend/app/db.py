@@ -37,6 +37,7 @@ def _migrate_sqlite():
         return
     adds = {
         "jobs": [
+            ("must_skills", "JSON"),
             ("job_types", "JSON"),
             ("company_size", "VARCHAR(32)"),
             ("overtime", "VARCHAR(32)"),
@@ -45,6 +46,9 @@ def _migrate_sqlite():
         ],
         "resumes": [
             ("job_status", "VARCHAR(16)"),
+            ("intended_titles", "JSON"),
+            ("target_job_types", "JSON"),
+            ("self_traits", "JSON"),
         ],
     }
     with engine.begin() as conn:

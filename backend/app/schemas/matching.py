@@ -7,6 +7,7 @@ class MatchRequest(BaseModel):
     direction: Literal["seeker_to_jobs", "enterprise_to_seekers"] = "seeker_to_jobs"
     target_id: Optional[int] = None  # resume id 或 job id；缺省用当前用户最新一份
     top_n: Optional[int] = None
+    availability: Optional[str] = None  # 企业端按求职状态筛选（随时到岗/本月到岗/观望了解）；None=不筛
 
 
 class MatchItem(BaseModel):

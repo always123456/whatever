@@ -35,6 +35,7 @@ class Job(Base):
     remote: Mapped[bool] = mapped_column(Boolean, default=False)
     description: Mapped[str] = mapped_column(Text, default="")
     # —— 信息采集细则新增字段（需求卡 facts / hard.job_types / soft.traits）——
+    must_skills: Mapped[List[str]] = mapped_column(JSON, default=list)  # 必备技能（硬过滤）
     job_types: Mapped[List[str]] = mapped_column(JSON, default=list)  # 社招/应届校招/实习生/兼职
     company_size: Mapped[str] = mapped_column(String(32), default="")      # 人员规模
     overtime: Mapped[str] = mapped_column(String(32), default="")          # 加班节奏
@@ -59,4 +60,8 @@ class Resume(Base):
     willing_remote: Mapped[bool] = mapped_column(Boolean, default=False)
     summary: Mapped[str] = mapped_column(Text, default="")
     job_status: Mapped[str] = mapped_column(String(16), default="")  # 随时到岗/本月到岗/观望了解
+    # —— 匹配算法新增字段 ——
+    intended_titles: Mapped[List[str]] = mapped_column(JSON, default=list)  # 意向职位（最多5个）
+    target_job_types: Mapped[List[str]] = mapped_column(JSON, default=list)  # 求职意向岗位类型
+    self_traits: Mapped[List[dict]] = mapped_column(JSON, default=list)  # 人才特质自评 [{dimension,value}]
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

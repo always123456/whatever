@@ -36,6 +36,7 @@
         <el-form-item label="经验年数"><el-input-number v-model="form.experience_years" :min="0" /></el-form-item>
         <el-form-item label="行业"><el-input v-model="form.industry" /></el-form-item>
         <el-form-item label="技能(逗号分隔)"><el-input v-model="skillsText" /></el-form-item>
+        <el-form-item label="必备技能(逗号分隔)"><el-input v-model="mustSkillsText" placeholder="缺一即淘汰，可留空" /></el-form-item>
         <el-form-item label="岗位类型">
           <el-select v-model="form.job_types" multiple placeholder="可多选">
             <el-option v-for="t in JOB_TYPES" :key="t" :label="t" :value="t" />
@@ -60,11 +61,11 @@
           <div class="trait-grid">
             <div v-for="t in TRAITS" :key="t.id" class="trait-item">
               <span class="trait-name">{{ t.name }}</span>
-              <el-select v-model="traitLevels[t.id]" size="small" style="width: 88px">
+              <el-select v-model="traitLevels[t.id]" size="small" style="width: 76px">
                 <el-option label="不限" value="不限" />
-                <el-option label="加分项" value="加分项" />
-                <el-option label="重要" value="重要" />
+                <el-option v-for="lv in TRAIT_LEVELS" :key="lv" :label="lv" :value="lv" />
               </el-select>
+              <el-checkbox v-model="traitFocus[t.id]" :disabled="traitLevels[t.id] === '不限'" size="small">重点</el-checkbox>
             </div>
           </div>
         </el-form-item>
@@ -89,9 +90,11 @@ const auth = useAuthStore()
 const jobs = ref<any[]>([])
 const dialog = ref(false)
 const skillsText = ref('')
+const mustSkillsText = ref('')
 
 // 枚举与后端 schemas/requirement.py 常量保持一致
 const JOB_TYPES = ['社招', '应届校招', '实习生', '兼职']
+const TRAIT_LEVELS = ['弱', '中', '强']
 const COMPANY_SIZES = ['1-49人', '50-99人', '100-499人', '500-999人', '1000人以上']
 const OVERTIMES = ['不加班', '偶尔加班', '经常加班', '大小周', '996']
 const SOCIAL_INSURANCES = ['全额缴纳', '按最低基数缴纳', '无公积金', '面议']
@@ -104,6 +107,9 @@ const TRAITS = [
 ]
 const traitLevels = reactive<Record<string, string>>(
   Object.fromEntries(TRAITS.map((t) => [t.id, '不限'])),
+)
+const traitFocus = reactive<Record<string, boolean>>(
+  Object.fromEntries(TRAITS.map((t) => [t.id, false])),
 )
 
 const form = reactive({
@@ -140,10 +146,11 @@ async function create() {
     await client.post('/jobs', {
       ...form,
       skills: skillsText.value.split(/[,，、]/).map((s) => s.trim()).filter(Boolean),
+      must_skills: mustSkillsText.value.split(/[,，、]/).map((s) => s.trim()).filter(Boolean),
       ideal_talents: TRAITS.filter((t) => traitLevels[t.id] !== '不限').map((t) => ({
         dimension: t.id,
         value: traitLevels[t.id],
-        importance: traitLevels[t.id] === '重要' ? 2.0 : 1.0,
+        importance: traitFocus[t.id] ? 2.0 : 1.0,
       })),
     })
     ElMessage.success('已发布')

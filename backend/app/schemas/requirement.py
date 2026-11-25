@@ -29,6 +29,29 @@ EDUCATION_LEVELS = ("不限", "大专", "本科", "硕士", "博士")
 JOB_TYPES = ("社招", "应届校招", "实习生", "兼职")
 # 求职者求职状态（信息采集细则；前端尚无下拉，待表单扩展时对齐）
 JOB_STATUSES = ("随时到岗", "本月到岗", "观望了解")
+# 人才特质水平档位（决策1）：企业卡 value=期望最低档，求职卡 value=自身水平档
+TRAIT_LEVELS = ("弱", "中", "强")
+TRAIT_LEVEL_SCORES = {"弱": 0.0, "中": 0.5, "强": 1.0}
+
+# 档位归一化（宽松）：LLM 抽取可能输出自由描述，映射不进枚举的落中性 0.5
+_TRAIT_LEVEL_ALIASES = {
+    0.0: ("弱", "欠缺", "不足", "较差", "很少"),
+    0.5: ("中", "一般", "尚可", "良好", "中等"),
+    1.0: ("强", "优秀", "突出", "很强", "出色"),
+}
+
+
+def normalize_trait_level(value: str) -> float:
+    """把特质 value 归一化到 0.0/0.5/1.0 档位分，未知值落中性 0.5。"""
+    v = (value or "").strip()
+    if not v:
+        return 0.5
+    if v in TRAIT_LEVEL_SCORES:
+        return TRAIT_LEVEL_SCORES[v]
+    for score, aliases in _TRAIT_LEVEL_ALIASES.items():
+        if v in aliases:
+            return score
+    return 0.5
 
 # 人才特质（附图1 / requirement.md）：4 大类 12 项
 # 采集来源：认知/动机靠情境题，行动靠经历，社交靠自由文本
@@ -144,12 +167,14 @@ class SoftPreference(BaseModel):
     skills: List[str] = Field(default_factory=list)        # 技能集合（重合度打分；求职卡为自身技能）
     industries: List[str] = Field(default_factory=list)    # 行业（企业=归属，求职=意向）
     intended_titles: List[str] = Field(default_factory=list)  # 意向职位（求职卡，最多5个）
+    target_job_types: List[str] = Field(default_factory=list)  # 求职意向岗位类型（求职卡，软打分）
     traits: List[TraitItem] = Field(default_factory=list)  # 人才特质（TALENT_TRAITS）
     importance: Dict[str, float] = Field(default_factory=dict)  # 维度权重覆盖
 
 
 class RequirementCard(BaseModel):
     """统一需求卡：三个 Agent 的契约。求职卡=seeker 画像，企业卡=岗位需求。"""
+    id: Optional[int] = None                # 关联数据库主键（匹配服务回填，便于结果返回），非内容语义
     role: CardRole
     label: str = ""                        # 职位名称（企业卡）/ 姓名（求职卡）
     hard: HardConstraint = Field(default_factory=HardConstraint)
