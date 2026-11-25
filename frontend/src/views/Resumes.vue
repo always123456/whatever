@@ -32,6 +32,11 @@
         <el-form-item label="经验年数"><el-input-number v-model="form.experience_years" :min="0" /></el-form-item>
         <el-form-item label="行业"><el-input v-model="form.industry" /></el-form-item>
         <el-form-item label="技能(逗号分隔)"><el-input v-model="skillsText" /></el-form-item>
+        <el-form-item label="求职状态">
+          <el-select v-model="form.job_status">
+            <el-option v-for="s in JOB_STATUSES" :key="s" :label="s" :value="s" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="可远程"><el-switch v-model="form.willing_remote" /></el-form-item>
         <el-form-item label="简介"><el-input v-model="form.summary" type="textarea" /></el-form-item>
       </el-form>
@@ -53,6 +58,10 @@ const auth = useAuthStore()
 const resumes = ref<any[]>([])
 const dialog = ref(false)
 const skillsText = ref('')
+
+// 枚举与后端 schemas/requirement.py JOB_STATUSES 保持一致
+const JOB_STATUSES = ['随时到岗', '本月到岗', '观望了解']
+
 const form = reactive({
   name: '',
   location: '',
@@ -63,6 +72,7 @@ const form = reactive({
   industry: '',
   willing_remote: false,
   summary: '',
+  job_status: '',
 })
 
 function salary(row: any) {

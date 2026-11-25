@@ -15,6 +15,7 @@ class ResumeCreate(BaseModel):
     skills: List[str] = []
     willing_remote: bool = False
     summary: str = ""
+    job_status: str = ""  # 随时到岗/本月到岗/观望了解
 
 
 class ResumeOut(ResumeCreate):
