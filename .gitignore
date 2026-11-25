@@ -11,7 +11,11 @@ __pycache__/
 # Node
 node_modules/
 dist/
+npm-cache/
 
 # misc
 .DS_Store
 .ipynb_checkpoints/
+
+# vscode
+.vscode/
