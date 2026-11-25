@@ -65,7 +65,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="companyDialog" title="公司信息" width="520px">
+    <el-dialog v-model="companyDialog" title="公司信息" width="680px">
       <el-form label-width="100px">
         <el-form-item label="公司名称"><el-input v-model="companyForm.name" /></el-form-item>
         <el-form-item label="公司简称"><el-input v-model="companyForm.abbr" /></el-form-item>
@@ -85,6 +85,9 @@
             <el-option v-for="s in SOCIAL_INSURANCES" :key="s" :label="s" :value="s" />
           </el-select>
         </el-form-item>
+        <el-form-item label="公司特质">
+          <CompanyTraitsForm v-model="companyForm.company_traits" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="companyDialog = false">取消</el-button>
@@ -99,6 +102,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import client from '../api/client'
 import { useAuthStore } from '../stores/auth'
+import CompanyTraitsForm from '../components/CompanyTraitsForm.vue'
 
 const auth = useAuthStore()
 const jobs = ref<any[]>([])
@@ -147,6 +151,7 @@ const companyForm = reactive({
   industry: '',
   overtime: '',
   social_insurance: '',
+  company_traits: {} as Record<string, Record<string, unknown>>,
 })
 
 function salary(row: any) {

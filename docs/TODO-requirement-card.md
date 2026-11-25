@@ -13,8 +13,8 @@
 | 求职者人才特质自评（12 项） | Resume.self_traits (JSON) | Resumes.vue 档位下拉（未填/弱/中/强） | 已完成（自评兜底，正式测评模块待做） |
 | 意向职位（≤5） | Resume.intended_titles (JSON) | Resumes.vue 逗号分隔 | 已完成 |
 | 求职意向岗位类型 | Resume.target_job_types (JSON) | Resumes.vue 多选 | 已完成（软打分） |
-| 公司特质（P-S-F-C-V-W 6 轴）双方 | facts.company_traits / ideal_company_traits | 前端无 | 待表单扩展（MVP 打分走中性降级） |
-| 学生与否 / 证书 | facts.is_student / certificates | 前端无 | Agent 抽取优先，表单后补 |
+| 公司特质（P-S-F-C-V-W 6 轴）双方 | facts.company_traits / ideal_company_traits | CompanyTraitsForm 组件 | 已完成（resumes 加 ideal_company_traits 列） |
+| 学生与否 / 证书 | facts.is_student / certificates | 前端无 | Agent 抽取已落（extract.py），表单后补 |
 
 新枚举在前后端各有一份常量（后端 schemas/requirement.py，前端 Jobs.vue / Resumes.vue），
 改动时两边同步；后续可抽 /api/dict 端点统一维护。
@@ -36,18 +36,23 @@
 - 公司特质 6 轴 LLM 打分（llm/company_traits.py：DeepSeek，temperature=0 + 缓存 + 确定性降级）。
 - 契约细节见 skill job-match-dev 的 references/matching.md。
 
-## 四、待做（需求理解 Agent 抽取，AGENT_DESIGN.md 实施顺序 3-5）
+## 四、需求理解 Agent 抽取（已完成本轮）
 
-1. llm/extract.py：原文（JD / 简历自述）→ RequirementCard 抽取 + Pydantic 校验 + 规则兜底。
-   （llm/client.py 的 chat_json + LLMUnavailable 降级路径已就绪，可复用）
-2. POST /api/requirement/parse 端点（schemas/requirement.py 的 RequirementParseRequest/Response 已定义）。
-3. 前端需求卡预览/校对页（views/Requirement.vue）。
-4. 学生与否 / 证书：Agent 抽取优先，抽取落地后 facts.is_student 从 None 变为真实值。
-5. 公司特质 6 轴采集表单（落地后 facts.company_traits / ideal_company_traits 有值，LLM 打分才真正生效）。
+- llm/extract.py：原文（JD / 简历自述）→ RequirementCard 抽取 + Pydantic 校验 + 规则兜底，输出走 normalize 归一。
+- POST /api/requirement/parse 端点（api/requirement.py，需登录）。
+- 前端预览页 views/Requirement.vue（路由 /requirement + 菜单）。
+- 公司特质 6 轴采集表单：共享组件 CompanyTraitsForm（企业端公司弹窗 + 求职端简历弹窗）；resumes 加 ideal_company_traits 列（迁移 f41e076a8551）。
+- 技能/行业别名归一 matching/normalize.py，转卡层 job_to_card / resume_to_card 接入；job.industry 留空时回退 company.industry。
+
+## 四-bis、仍待做
+
+1. ~~抽取结果「合并进卡」写路径~~：已完成 —— POST /api/requirement/apply（matching_service.apply_extracted_card，非空合并 + 归属校验）。
+2. 求职者人才特质测评模块（现状仍是自评下拉兜底）。
+3. /api/dict 字典表：枚举与技能/行业字典统一维护（当前前后端各一份常量 + 内置别名表）。
 
 ## 五、数据库说明（已切 PostgreSQL）
 
 - 统一 PostgreSQL（本地 127.0.0.1:5432 库 job_match/角色 job_match，密码在 backend/.env 的 JM_DATABASE_URL）。
 - 迁移用 alembic（backend/alembic.ini + alembic/env.py，env.py 从 app.config 读 JM_ 环境变量）：改 db_models.py 后 `alembic revision --autogenerate` + `alembic upgrade head`；init_db() 启动时自动 upgrade head，_migrate_sqlite 已删除。
-- 表：users / companies（企业主体 1:1）/ jobs（company_id 外键，去掉 company 字符串与 company_size/overtime/social_insurance）/ resumes / requirement_cards（卡落库，facts 只进卡表）/ match_records（快照目标卡）。
-- 写路径 upsert_card() 落卡、读卡 get_card()（无卡回退派生），见 services/matching_service.py。
+- 表：users / companies（企业主体 1:1）/ jobs（company_id 外键，去掉 company 字符串与 company_size/overtime/social_insurance）/ resumes（含 ideal_company_traits 列）/ requirement_cards（卡落库，facts 只进卡表）/ match_records（快照目标卡）。
+- 写路径 upsert_card() 落卡、读卡 get_card()（无卡回退派生），见 services/matching_service.py；转卡层做技能/行业归一（matching/normalize.py）。

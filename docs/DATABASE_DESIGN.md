@@ -108,6 +108,7 @@ users   1 ── N match_records  （用户发起的匹配历史）
 | intended_titles | JSON list | 意向职位（最多 5 个） | soft.intended_titles |
 | target_job_types | JSON list | 求职意向岗位类型 | soft.target_job_types |
 | self_traits | JSON list[dict] | 人才特质自评 `[{dimension,value}]` | soft.traits |
+| ideal_company_traits | JSON dict | 理想公司特质（JOB_FACT_AXES 6 轴） | facts.ideal_company_traits |
 | created_at / updated_at | timestamp | 创建 / 更新时间 | — |
 
 ### 3.5 requirement_cards —— 需求卡落库
@@ -165,6 +166,9 @@ users   1 ── N match_records  （用户发起的匹配历史）
 - 人才特质 TALENT_TRAITS：C-A-S-M 四类 12 项（C1..M3）
 - 特质档位 TRAIT_LEVELS：弱 / 中 / 强（打分映射 0 / 0.5 / 1.0）
 - 岗位事实评估 JOB_FACT_AXES：P 节奏 / S 结构 / F 反馈 / C 协作 / V 价值 / W 形态，各 3 字段
+- 企业规模 COMPANY_SIZES：1-49人 / 50-99人 / 100-499人 / 500-999人 / 1000人以上
+- 加班节奏 OVERTIMES：不加班 / 偶尔加班 / 经常加班 / 大小周 / 996
+- 社保公积金 SOCIAL_INSURANCES：全额缴纳 / 按最低基数缴纳 / 无公积金 / 面议
 
 ---
 

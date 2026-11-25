@@ -54,6 +54,9 @@
             </div>
           </div>
         </el-form-item>
+        <el-form-item label="理想公司特质">
+          <CompanyTraitsForm v-model="form.ideal_company_traits" />
+        </el-form-item>
         <el-form-item label="可远程"><el-switch v-model="form.willing_remote" /></el-form-item>
         <el-form-item label="简介"><el-input v-model="form.summary" type="textarea" /></el-form-item>
       </el-form>
@@ -70,6 +73,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import client from '../api/client'
 import { useAuthStore } from '../stores/auth'
+import CompanyTraitsForm from '../components/CompanyTraitsForm.vue'
 
 const auth = useAuthStore()
 const resumes = ref<any[]>([])
@@ -104,6 +108,7 @@ const form = reactive({
   summary: '',
   job_status: '',
   target_job_types: [] as string[],
+  ideal_company_traits: {} as Record<string, Record<string, unknown>>,
 })
 
 function salary(row: any) {

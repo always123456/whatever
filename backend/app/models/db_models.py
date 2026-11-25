@@ -112,6 +112,7 @@ class Resume(Base):
     intended_titles: Mapped[List[str]] = mapped_column(JSON, default=list)  # 意向职位（最多5个）
     target_job_types: Mapped[List[str]] = mapped_column(JSON, default=list)  # 求职意向岗位类型
     self_traits: Mapped[List[dict]] = mapped_column(JSON, default=list)  # 人才特质自评
+    ideal_company_traits: Mapped[dict] = mapped_column(JSON, default=dict)  # 理想公司特质（JOB_FACT_AXES 6 轴）
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()

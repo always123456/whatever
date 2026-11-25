@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import auth, companies, jobs, matching, resumes
+from .api import auth, companies, jobs, matching, requirement, resumes
 from .db import init_db
 from .services.seed import seed_if_empty
 

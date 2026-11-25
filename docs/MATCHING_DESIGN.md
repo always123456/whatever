@@ -83,8 +83,10 @@
 ### 1.5 数据库 / 表单映射
 
 - Job 表：`title→label`、`must_skills→hard.must_skills`、`job_types→hard.job_types`、
-  `ideal_talents→soft.traits`、`company_size/overtime/social_insurance→facts`、
-  `description→raw_text`、其余薪资/学历/经验/地点/远程/技能直接对应。
+  `ideal_talents→soft.traits`、`description→raw_text`、
+  其余薪资/学历/经验/地点/远程/技能直接对应。
+- Companies 表（经 `job.company` 关系）：`company_name/company_abbr/company_size/
+  industry/overtime/social_insurance/company_traits→facts`。
 - Resume 表：`job_status→hard.job_status`、`intended_titles/target_job_types→soft`、
   `self_traits→soft.traits`、`summary→raw_text + facts.self_assessment`、
   其余薪资/学历/经验/地点/远程/技能直接对应。

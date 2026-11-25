@@ -17,5 +17,10 @@ npm-cache/
 .DS_Store
 .ipynb_checkpoints/
 
+# 本地辅助脚本（含本机 conda 路径，不提交）
+run_tests.sh
+run_tests.bat
+dev.bat
+
 # vscode
 .vscode/

@@ -6,6 +6,7 @@
         <el-menu-item index="/match">智能匹配</el-menu-item>
         <el-menu-item index="/jobs">职位</el-menu-item>
         <el-menu-item index="/resumes">简历</el-menu-item>
+        <el-menu-item index="/requirement">需求卡抽取</el-menu-item>
       </el-menu>
       <div class="right">
         <span class="who">

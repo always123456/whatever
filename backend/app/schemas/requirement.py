@@ -29,6 +29,10 @@ EDUCATION_LEVELS = ("不限", "大专", "本科", "硕士", "博士")
 JOB_TYPES = ("社招", "应届校招", "实习生", "兼职")
 # 求职者求职状态（信息采集细则；前端尚无下拉，待表单扩展时对齐）
 JOB_STATUSES = ("随时到岗", "本月到岗", "观望了解")
+# 企业规模 / 加班节奏 / 社保公积金（前端 Jobs.vue 公司档案下拉一致）
+COMPANY_SIZES = ("1-49人", "50-99人", "100-499人", "500-999人", "1000人以上")
+OVERTIMES = ("不加班", "偶尔加班", "经常加班", "大小周", "996")
+SOCIAL_INSURANCES = ("全额缴纳", "按最低基数缴纳", "无公积金", "面议")
 # 人才特质水平档位（决策1）：企业卡 value=期望最低档，求职卡 value=自身水平档
 TRAIT_LEVELS = ("弱", "中", "强")
 TRAIT_LEVEL_SCORES = {"弱": 0.0, "中": 0.5, "强": 1.0}
@@ -71,37 +75,39 @@ TALENT_TRAITS: Dict[str, Dict[str, str]] = {
 }
 
 # 岗位事实评估维度（附图2 / requirement.md，P-S-F-C-V-W）：
-# 求职卡 facts.ideal_company_traits 与企业卡 facts.company_traits 共用此结构
+# 求职卡 facts.ideal_company_traits 与企业卡 facts.company_traits 共用此结构。
+# 每个字段 (key, 中文名, 采集定义)：type=select(带 options)/int(带 min/max)/text，
+# 前端据此渲染控件；company_traits.py 只解包前两元，采集定义不影响打分。
 JOB_FACT_AXES: Dict[str, Dict[str, Any]] = {
     "P": {"name": "节奏", "fields": [
-        ("busy_months", "忙季每年几个月", "0-12"),
-        ("busy_week_hours", "忙季周工时", "h"),
-        ("response_hours", "日常消息响应期望", "小时"),
+        ("busy_months", "忙季每年几个月", {"type": "int", "min": 0, "max": 12}),
+        ("busy_week_hours", "忙季周工时", {"type": "int", "min": 0, "max": 168}),
+        ("response_hours", "日常消息响应期望", {"type": "int", "min": 0, "max": 168}),
     ]},
     "S": {"name": "结构", "fields": [
-        ("decision_layers", "到决策者几层", "1-5"),
-        ("decision_days", "需求平均决策天数", "数值"),
-        ("process_docs", "流程文档化", "无/部分/完整"),
+        ("decision_layers", "到决策者几层", {"type": "int", "min": 1, "max": 5}),
+        ("decision_days", "需求平均决策天数", {"type": "int", "min": 0, "max": 365}),
+        ("process_docs", "流程文档化", {"type": "select", "options": ["无", "部分", "完整"]}),
     ]},
     "F": {"name": "反馈", "fields": [
-        ("one_on_one", "1v1 频率", "周/月/季/无"),
-        ("feedback_from", "谁给反馈", "直属/上级/无"),
-        ("promotion_cycle", "晋升评审周期", "文本"),
+        ("one_on_one", "1v1 频率", {"type": "select", "options": ["周", "月", "季", "无"]}),
+        ("feedback_from", "谁给反馈", {"type": "select", "options": ["直属", "上级", "无"]}),
+        ("promotion_cycle", "晋升评审周期", {"type": "text"}),
     ]},
     "C": {"name": "协作", "fields": [
-        ("division", "分工方式", "按模块/按人/混合"),
-        ("channel", "主沟通渠道", "口头/文档/两者"),
-        ("dispute_owner", "分歧谁定", "直属/上级/集体"),
+        ("division", "分工方式", {"type": "select", "options": ["按模块", "按人", "混合"]}),
+        ("channel", "主沟通渠道", {"type": "select", "options": ["口头", "文档", "两者"]}),
+        ("dispute_owner", "分歧谁定", {"type": "select", "options": ["直属", "上级", "集体"]}),
     ]},
     "V": {"name": "价值", "fields": [
-        ("perf_metric", "绩效看结果还是过程", "结果/过程"),
-        ("reward", "奖励团队还是个人", "团队/个人"),
-        ("stability", "偏好稳定还是变化", "稳定/变化"),
+        ("perf_metric", "绩效看结果还是过程", {"type": "select", "options": ["结果", "过程"]}),
+        ("reward", "奖励团队还是个人", {"type": "select", "options": ["团队", "个人"]}),
+        ("stability", "偏好稳定还是变化", {"type": "select", "options": ["稳定", "变化"]}),
     ]},
     "W": {"name": "形态", "fields": [
-        ("office_days", "每周到岗天数", "0-7"),
-        ("travel_days", "每月出差天数", "0-31"),
-        ("cross_tz", "跨时区协作", "有/无"),
+        ("office_days", "每周到岗天数", {"type": "int", "min": 0, "max": 7}),
+        ("travel_days", "每月出差天数", {"type": "int", "min": 0, "max": 31}),
+        ("cross_tz", "跨时区协作", {"type": "select", "options": ["有", "无"]}),
     ]},
 }
 
@@ -206,3 +212,10 @@ class RequirementParseResponse(BaseModel):
     """需求卡预览：供用户校对，warnings 提示缺失/不确定字段。"""
     card: RequirementCard
     warnings: List[str] = Field(default_factory=list)
+
+
+class RequirementApplyRequest(BaseModel):
+    """POST /api/requirement/apply 的入参：把预览卡合并写回目标实体（简历/职位）的需求卡。"""
+    role: CardRole
+    target_id: Optional[int] = None  # resume_id 或 job_id；缺省用当前用户最新一份
+    card: RequirementCard  # 抽取预览卡（前端原样传回）

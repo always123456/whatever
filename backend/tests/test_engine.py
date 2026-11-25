@@ -197,3 +197,44 @@ def test_company_traits_deterministic_fallback():
     score, reason = score_company_traits(ideal, company)
     assert score == round((1 + 0.5 * 5) / 6, 4)
     assert "降级" in reason or "确定性" in reason
+
+
+def test_merge_cards_nonempty_overrides_and_empty_preserves():
+    from app.services.matching_service import _merge_cards
+    existing = RequirementCard(
+        role="seeker", label="张三",
+        hard=HardConstraint(location="北京", salary_min=20, salary_max=30,
+                            education="本科", experience_years=3),
+        soft=SoftPreference(skills=["Python", "FastAPI"], industries=["互联网"]),
+    )
+    extracted = RequirementCard(
+        role="seeker",
+        hard=HardConstraint(location="上海", salary_min=25),
+        soft=SoftPreference(skills=["Python", "Docker"]),
+        facts={"is_student": False, "certificates": ["CET6"]},
+    )
+    merged = _merge_cards(existing, extracted)
+    assert merged.hard.location == "上海"              # 抽取非空覆盖
+    assert merged.hard.salary_min == 25                # 抽取非空覆盖
+    assert merged.hard.salary_max == 30                # 抽取未给，保留
+    assert merged.hard.education == "本科"             # 抽取未给，保留
+    assert merged.soft.skills == ["Python", "Docker"]  # 抽取覆盖
+    assert merged.facts["is_student"] is False         # 抽取补充
+    assert merged.facts["certificates"] == ["CET6"]    # 抽取补充
+    assert merged.source == "llm"
+
+
+def test_merge_cards_empty_extraction_does_not_clobber():
+    from app.services.matching_service import _merge_cards
+    existing = RequirementCard(
+        role="seeker", label="张三",
+        hard=HardConstraint(location="北京", salary_min=20, salary_max=30, education="本科"),
+        soft=SoftPreference(skills=["Python"], industries=["互联网"]),
+        facts={"self_assessment": "自评"},
+    )
+    extracted = RequirementCard(role="seeker", facts={"is_student": None, "certificates": []})
+    merged = _merge_cards(existing, extracted)
+    assert merged.hard.location == "北京"          # 空抽取不改
+    assert merged.soft.skills == ["Python"]        # 空抽取不改
+    assert merged.facts["self_assessment"] == "自评"  # 已有非空保留
+    assert "is_student" not in merged.facts        # 空值不写入

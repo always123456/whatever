@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..config import settings
 from ..matching.engine import match as engine_match
+from ..matching.normalize import normalize_industry, normalize_skills
 from ..models.db_models import Job, MatchRecord, RequirementCardRecord, Resume, User
 from ..schemas.matching import MatchItem, MatchResult
 from ..schemas.requirement import (
@@ -17,8 +18,12 @@ AVAILABILITY_RANK = {"随时到岗": 0, "本月到岗": 1, "观望了解": 2}
 
 
 def job_to_card(job: Job) -> RequirementCard:
-    """岗位 ORM → 企业需求卡。公司级字段取自 job.company（companies 表）。"""
+    """岗位 ORM → 企业需求卡。公司级字段取自 job.company（companies 表）。
+
+    industry 双来源：岗位行业优先，未填回退公司行业（避免行业维度因岗位留空而中性化）。
+    """
     company = job.company
+    industry = job.industry or (company.industry if company else "")
     return RequirementCard(
         id=job.id,
         role="enterprise",
@@ -30,19 +35,19 @@ def job_to_card(job: Job) -> RequirementCard:
             salary_max=job.salary_max,
             education=job.education,
             experience_years=job.experience_years,
-            must_skills=job.must_skills or [],
+            must_skills=normalize_skills(job.must_skills),
             job_types=job.job_types or [],
         ),
         soft=SoftPreference(
-            skills=job.skills or [],
-            industries=[job.industry] if job.industry else [],
+            skills=normalize_skills(job.skills),
+            industries=[normalize_industry(industry)] if industry else [],
             traits=[TraitItem(**t) for t in (job.ideal_talents or [])],
         ),
         facts={
             "company_name": company.name if company else "",
             "company_abbr": company.abbr if company else "",
             "company_size": company.size if company else "",
-            "industry": job.industry or (company.industry if company else ""),
+            "industry": industry,
             "overtime": company.overtime if company else "",
             "social_insurance": company.social_insurance if company else "",
             "company_traits": (company.company_traits or {}) if company else {},
@@ -68,8 +73,8 @@ def resume_to_card(r: Resume) -> RequirementCard:
             job_status=r.job_status,
         ),
         soft=SoftPreference(
-            skills=r.skills or [],
-            industries=[r.industry] if r.industry else [],
+            skills=normalize_skills(r.skills),
+            industries=[normalize_industry(r.industry)] if r.industry else [],
             intended_titles=r.intended_titles or [],
             target_job_types=r.target_job_types or [],
             traits=[TraitItem(**t) for t in (r.self_traits or [])],
@@ -77,6 +82,7 @@ def resume_to_card(r: Resume) -> RequirementCard:
         facts={
             "is_student": None,  # 学生与否：Agent 抽取优先，表单后补（MVP 中性）
             "self_assessment": r.summary,
+            "ideal_company_traits": r.ideal_company_traits or {},
         },
         source="form",
         raw_text=r.summary,
@@ -231,3 +237,74 @@ def match(db: Session, user: User, req) -> MatchResult:
         for cand, score, rules, reasons in results
     ]
     return MatchResult(direction=direction, results=items)
+
+
+def _non_empty(v) -> bool:
+    """抽取字段「非空」判定：None/空串/空容器视为空；False/0 视为有效值（如 is_student=False）。"""
+    if v is None:
+        return False
+    if isinstance(v, str):
+        return bool(v.strip())
+    if isinstance(v, (list, dict)):
+        return bool(v)
+    return True
+
+
+def _merge_cards(existing: RequirementCard, extracted: RequirementCard) -> RequirementCard:
+    """抽取卡合并进已有卡：抽取的非空 hard/soft 覆盖，facts 逐键补非空、不覆盖已有非空。"""
+    merged = existing.model_copy(deep=True)
+    xh, xs, xf = extracted.hard, extracted.soft, extracted.facts
+
+    # hard 标量：抽取非 None 才覆盖；remote 仅抽取为 True 时覆盖（避免误清表单）
+    for field in ("location", "salary_min", "salary_max", "education", "experience_years", "job_status"):
+        v = getattr(xh, field)
+        if v is not None:
+            setattr(merged.hard, field, v)
+    if xh.remote:
+        merged.hard.remote = True
+    if xh.must_skills:
+        merged.hard.must_skills = xh.must_skills
+    if xh.job_types:
+        merged.hard.job_types = xh.job_types
+
+    # soft：抽取非空才覆盖
+    for field in ("skills", "industries", "intended_titles", "target_job_types"):
+        v = getattr(xs, field)
+        if v:
+            setattr(merged.soft, field, v)
+    if xs.traits:
+        merged.soft.traits = xs.traits
+
+    # facts：逐键补非空，已有非空不被空值覆盖
+    for k, v in (xf or {}).items():
+        if _non_empty(v):
+            merged.facts[k] = v
+
+    merged.source = "llm"
+    if extracted.raw_text:
+        merged.raw_text = extracted.raw_text
+    return merged
+
+
+def apply_extracted_card(db: Session, user: User, req) -> RequirementCard:
+    """把抽取预览卡合并写回目标实体（简历/职位）的需求卡。校验归属：只能写自己的实体。"""
+    if req.role == "seeker":
+        if user.role != "seeker":
+            raise HTTPException(403, "仅求职者可写求职卡")
+        resume = _target_for_seeker(db, user, req.target_id)
+        if resume.owner_id != user.id:
+            raise HTTPException(403, "只能写自己的简历")
+        existing = get_card(db, "seeker", resume.id, resume_to_card(resume))
+        merged = _merge_cards(existing, req.card)
+        upsert_card(db, "seeker", resume.id, merged, source="llm")
+    else:
+        if user.role != "enterprise":
+            raise HTTPException(403, "仅企业可写岗位卡")
+        job = _target_for_enterprise(db, user, req.target_id)
+        if job.owner_id != user.id:
+            raise HTTPException(403, "只能写自己的职位")
+        existing = get_card(db, "enterprise", job.id, job_to_card(job))
+        merged = _merge_cards(existing, req.card)
+        upsert_card(db, "enterprise", job.id, merged, source="llm")
+    db.commit()
+    return merged
