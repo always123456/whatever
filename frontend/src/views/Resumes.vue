@@ -1,11 +1,15 @@
 <template>
   <div>
     <div class="toolbar">
-      <h3>简历列表</h3>
+      <h3>{{ auth.isEnterprise ? '投递简历' : '简历列表' }}</h3>
       <el-button v-if="!auth.isEnterprise" type="primary" @click="dialog = true">创建简历</el-button>
     </div>
+    <p v-if="auth.isEnterprise" class="tip">仅展示投递了本公司岗位的求职者简历。</p>
     <el-table :data="resumes" stripe>
       <el-table-column prop="name" label="姓名" />
+      <el-table-column v-if="auth.isEnterprise" label="投递岗位">
+        <template #default="{ row }">{{ (row.applied_job_titles || []).join('、') }}</template>
+      </el-table-column>
       <el-table-column prop="location" label="地点" />
       <el-table-column label="期望薪资">
         <template #default="{ row }">{{ salary(row) }}</template>
@@ -150,6 +154,11 @@ onMounted(load)
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.tip {
+  color: #909399;
+  font-size: 12px;
+  margin: 0 0 8px;
 }
 .trait-grid {
   display: grid;

@@ -32,3 +32,4 @@ class ResumeOut(ResumeCreate):
     owner_id: int
     created_at: datetime
     updated_at: datetime
+    applied_job_titles: List[str] = []  # 企业视角：该简历投递的本公司岗位标题（求职者视角恒为空）

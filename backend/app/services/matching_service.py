@@ -158,6 +158,8 @@ def _target_for_seeker(db: Session, user: User, target_id):
         r = db.get(Resume, target_id)
         if r is None:
             raise HTTPException(404, "简历不存在")
+        if r.owner_id != user.id:
+            raise HTTPException(403, "只能使用自己的简历进行匹配")
         return r
     r = db.query(Resume).filter(Resume.owner_id == user.id).order_by(Resume.id.desc()).first()
     if r is None:
@@ -170,6 +172,8 @@ def _target_for_enterprise(db: Session, user: User, target_id):
         j = db.get(Job, target_id)
         if j is None:
             raise HTTPException(404, "职位不存在")
+        if j.owner_id != user.id:
+            raise HTTPException(403, "只能使用自己发布的职位进行匹配")
         return j
     j = db.query(Job).filter(Job.owner_id == user.id).order_by(Job.id.desc()).first()
     if j is None:
@@ -180,6 +184,11 @@ def _target_for_enterprise(db: Session, user: User, target_id):
 def match(db: Session, user: User, req) -> MatchResult:
     direction = req.direction
     top_n = req.top_n or settings.top_n
+
+    # 匹配方向必须与账号角色一致：求职者只能「求职者→职位」，企业只能「企业→求职者」
+    expected = "seeker_to_jobs" if user.role == "seeker" else "enterprise_to_seekers"
+    if direction != expected:
+        raise HTTPException(403, f"当前账号仅支持 {expected} 方向的匹配")
 
     if direction == "seeker_to_jobs":
         resume = _target_for_seeker(db, user, req.target_id)
@@ -286,25 +295,25 @@ def _merge_cards(existing: RequirementCard, extracted: RequirementCard) -> Requi
     return merged
 
 
-def apply_extracted_card(db: Session, user: User, req) -> RequirementCard:
+def apply_extracted_card(db: Session, user: User, role: str, target_id, card: RequirementCard) -> RequirementCard:
     """把抽取预览卡合并写回目标实体（简历/职位）的需求卡。校验归属：只能写自己的实体。"""
-    if req.role == "seeker":
+    if role == "seeker":
         if user.role != "seeker":
             raise HTTPException(403, "仅求职者可写求职卡")
-        resume = _target_for_seeker(db, user, req.target_id)
+        resume = _target_for_seeker(db, user, target_id)
         if resume.owner_id != user.id:
             raise HTTPException(403, "只能写自己的简历")
         existing = get_card(db, "seeker", resume.id, resume_to_card(resume))
-        merged = _merge_cards(existing, req.card)
+        merged = _merge_cards(existing, card)
         upsert_card(db, "seeker", resume.id, merged, source="llm")
     else:
         if user.role != "enterprise":
             raise HTTPException(403, "仅企业可写岗位卡")
-        job = _target_for_enterprise(db, user, req.target_id)
+        job = _target_for_enterprise(db, user, target_id)
         if job.owner_id != user.id:
             raise HTTPException(403, "只能写自己的职位")
         existing = get_card(db, "enterprise", job.id, job_to_card(job))
-        merged = _merge_cards(existing, req.card)
+        merged = _merge_cards(existing, card)
         upsert_card(db, "enterprise", job.id, merged, source="llm")
     db.commit()
     return merged

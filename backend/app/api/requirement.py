@@ -19,10 +19,14 @@ router = APIRouter(prefix="/requirement", tags=["requirement"])
 @router.post("/parse", response_model=RequirementParseResponse)
 def parse_requirement(
     payload: RequirementParseRequest,
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
-    """原文（JD / 简历自述）→ 需求卡预览，供用户校对后再合并进卡。"""
-    card, warnings = extract_card(payload.role, payload.raw_text)
+    """原文（JD / 简历自述）→ 需求卡预览，供用户校对后再合并进卡。
+
+    对象类型跟随账号角色（求职者=seeker、企业=enterprise），不接受前端选择。
+    """
+    role = user.role
+    card, warnings = extract_card(role, payload.raw_text)
     return RequirementParseResponse(card=card, warnings=warnings)
 
 
@@ -32,5 +36,6 @@ def apply_requirement(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """把抽取预览卡合并写回目标实体（简历/职位）的需求卡。"""
-    return apply_extracted_card(db, user, payload)
+    """把抽取预览卡合并写回目标实体（简历/职位）的需求卡。对象类型跟随账号角色。"""
+    role = user.role
+    return apply_extracted_card(db, user, role, payload.target_id, payload.card)

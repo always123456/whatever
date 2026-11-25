@@ -1,3 +1,4 @@
+from .application import APPLICATION_STATUSES, ApplicationCreate, ApplicationOut
 from .job import IdealTalent, JobCreate, JobOut
 from .matching import MatchItem, MatchRequest, MatchResult
 from .requirement import (
@@ -15,6 +16,9 @@ __all__ = [
     "IdealTalent",
     "JobCreate",
     "JobOut",
+    "ApplicationCreate",
+    "ApplicationOut",
+    "APPLICATION_STATUSES",
     "ResumeCreate",
     "ResumeOut",
     "UserCreate",
