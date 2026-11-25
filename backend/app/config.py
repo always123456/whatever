@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     )
 
     debug: bool = False
-    database_url: str = "sqlite:///./job_match.db"
+    database_url: str = "postgresql+psycopg://job_match@127.0.0.1:5432/job_match"
     secret_key: str = "dev-secret-change-me"
     access_token_expire_minutes: int = 60 * 24
     top_n: int = 10

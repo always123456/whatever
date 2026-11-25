@@ -17,7 +17,6 @@ class IdealTalent(BaseModel):
 
 class JobCreate(BaseModel):
     title: str
-    company: str
     location: str
     salary_min: Optional[float] = Field(default=None, description="月薪下限（千元）")
     salary_max: Optional[float] = Field(default=None, description="月薪上限（千元）")
@@ -30,10 +29,8 @@ class JobCreate(BaseModel):
     # —— 信息采集细则新增字段 ——
     must_skills: List[str] = []       # 必备技能，缺一淘汰（硬过滤）
     job_types: List[str] = []          # 社招/应届校招/实习生/兼职
-    company_size: str = ""             # 人员规模
-    overtime: str = ""                 # 加班节奏
-    social_insurance: str = ""         # 社保、公积金
     ideal_talents: List[IdealTalent] = []  # 理想人才特质
+    # 公司归属：企业用户发布职位时后端自动绑定其公司（company_id），不再由前端传公司字符串
 
 
 class JobOut(JobCreate):
@@ -41,4 +38,8 @@ class JobOut(JobCreate):
 
     id: int
     owner_id: int
+    company_id: Optional[int] = None
+    company_name: Optional[str] = None  # 展示用，由 Job.company 关系回填
+    status: str = "active"
     created_at: datetime
+    updated_at: datetime

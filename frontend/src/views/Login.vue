@@ -27,7 +27,7 @@
         </el-button>
       </el-form>
       <p class="hint">
-        演示账号（密码均 123456）：企业 enterprise1；求职者 seeker1 ~ seeker4
+        演示账号（密码均 123456）：企业 enterprise1 ~ enterprise4；求职者 seeker1 ~ seeker4
       </p>
     </el-card>
   </div>

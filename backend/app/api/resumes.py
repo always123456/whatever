@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models.db_models import Resume, User
 from ..schemas.resume import ResumeCreate, ResumeOut
+from ..services.matching_service import resume_to_card, upsert_card
 from .deps import get_current_user
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
@@ -19,6 +20,8 @@ def create_resume(
         raise HTTPException(403, detail="仅求职者账号可创建简历")
     resume = Resume(owner_id=user.id, **payload.model_dump())
     db.add(resume)
+    db.flush()
+    upsert_card(db, "seeker", resume.id, resume_to_card(resume), source="form")
     db.commit()
     db.refresh(resume)
     return resume

@@ -45,7 +45,9 @@
 4. 学生与否 / 证书：Agent 抽取优先，抽取落地后 facts.is_student 从 None 变为真实值。
 5. 公司特质 6 轴采集表单（落地后 facts.company_traits / ideal_company_traits 有值，LLM 打分才真正生效）。
 
-## 五、数据库说明
+## 五、数据库说明（已切 PostgreSQL）
 
-- MVP 用 SQLite + db.py 里 _migrate_sqlite() 幂等补列（新增字段无需重建库）。
-- 切 PostgreSQL 时删掉 _migrate_sqlite，改用正式迁移工具（alembic）。
+- 统一 PostgreSQL（本地 127.0.0.1:5432 库 job_match/角色 job_match，密码在 backend/.env 的 JM_DATABASE_URL）。
+- 迁移用 alembic（backend/alembic.ini + alembic/env.py，env.py 从 app.config 读 JM_ 环境变量）：改 db_models.py 后 `alembic revision --autogenerate` + `alembic upgrade head`；init_db() 启动时自动 upgrade head，_migrate_sqlite 已删除。
+- 表：users / companies（企业主体 1:1）/ jobs（company_id 外键，去掉 company 字符串与 company_size/overtime/social_insurance）/ resumes / requirement_cards（卡落库，facts 只进卡表）/ match_records（快照目标卡）。
+- 写路径 upsert_card() 落卡、读卡 get_card()（无卡回退派生），见 services/matching_service.py。

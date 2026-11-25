@@ -2,11 +2,14 @@
   <div>
     <div class="toolbar">
       <h3>职位列表</h3>
-      <el-button v-if="auth.isEnterprise" type="primary" @click="dialog = true">发布职位</el-button>
+      <div>
+        <el-button v-if="auth.isEnterprise" @click="openCompany">公司信息</el-button>
+        <el-button v-if="auth.isEnterprise" type="primary" @click="dialog = true">发布职位</el-button>
+      </div>
     </div>
     <el-table :data="jobs" stripe>
       <el-table-column prop="title" label="职位" />
-      <el-table-column prop="company" label="公司" />
+      <el-table-column prop="company_name" label="公司" />
       <el-table-column prop="location" label="地点" />
       <el-table-column label="薪资">
         <template #default="{ row }">{{ salary(row) }}</template>
@@ -24,7 +27,6 @@
     <el-dialog v-model="dialog" title="发布职位" width="640px">
       <el-form label-width="100px">
         <el-form-item label="职位名称"><el-input v-model="form.title" /></el-form-item>
-        <el-form-item label="公司"><el-input v-model="form.company" /></el-form-item>
         <el-form-item label="地点"><el-input v-model="form.location" /></el-form-item>
         <el-form-item label="薪资下限(k)"><el-input-number v-model="form.salary_min" :min="0" /></el-form-item>
         <el-form-item label="薪资上限(k)"><el-input-number v-model="form.salary_max" :min="0" /></el-form-item>
@@ -40,21 +42,6 @@
         <el-form-item label="岗位类型">
           <el-select v-model="form.job_types" multiple placeholder="可多选">
             <el-option v-for="t in JOB_TYPES" :key="t" :label="t" :value="t" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="公司规模">
-          <el-select v-model="form.company_size" clearable placeholder="选择规模">
-            <el-option v-for="s in COMPANY_SIZES" :key="s" :label="s" :value="s" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="加班节奏">
-          <el-select v-model="form.overtime" clearable placeholder="选择加班情况">
-            <el-option v-for="o in OVERTIMES" :key="o" :label="o" :value="o" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="社保公积金">
-          <el-select v-model="form.social_insurance" clearable placeholder="选择缴纳情况">
-            <el-option v-for="s in SOCIAL_INSURANCES" :key="s" :label="s" :value="s" />
           </el-select>
         </el-form-item>
         <el-form-item label="理想人才特质">
@@ -75,6 +62,33 @@
       <template #footer>
         <el-button @click="dialog = false">取消</el-button>
         <el-button type="primary" @click="create">发布</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="companyDialog" title="公司信息" width="520px">
+      <el-form label-width="100px">
+        <el-form-item label="公司名称"><el-input v-model="companyForm.name" /></el-form-item>
+        <el-form-item label="公司简称"><el-input v-model="companyForm.abbr" /></el-form-item>
+        <el-form-item label="公司规模">
+          <el-select v-model="companyForm.size" clearable placeholder="选择规模">
+            <el-option v-for="s in COMPANY_SIZES" :key="s" :label="s" :value="s" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="行业"><el-input v-model="companyForm.industry" /></el-form-item>
+        <el-form-item label="加班节奏">
+          <el-select v-model="companyForm.overtime" clearable placeholder="选择加班情况">
+            <el-option v-for="o in OVERTIMES" :key="o" :label="o" :value="o" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="社保公积金">
+          <el-select v-model="companyForm.social_insurance" clearable placeholder="选择缴纳情况">
+            <el-option v-for="s in SOCIAL_INSURANCES" :key="s" :label="s" :value="s" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="companyDialog = false">取消</el-button>
+        <el-button type="primary" @click="saveCompany">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -114,7 +128,6 @@ const traitFocus = reactive<Record<string, boolean>>(
 
 const form = reactive({
   title: '',
-  company: '',
   location: '',
   salary_min: null as number | null,
   salary_max: null as number | null,
@@ -124,7 +137,14 @@ const form = reactive({
   remote: false,
   description: '',
   job_types: [] as string[],
-  company_size: '',
+})
+
+const companyDialog = ref(false)
+const companyForm = reactive({
+  name: '',
+  abbr: '',
+  size: '',
+  industry: '',
   overtime: '',
   social_insurance: '',
 })
@@ -139,6 +159,31 @@ function salary(row: any) {
 async function load() {
   const { data } = await client.get('/jobs')
   jobs.value = data
+}
+
+async function loadCompany() {
+  if (!auth.isEnterprise) return
+  try {
+    const { data } = await client.get('/company')
+    Object.assign(companyForm, data)
+  } catch (e: any) {
+    ElMessage.error(e.message)
+  }
+}
+
+function openCompany() {
+  companyDialog.value = true
+}
+
+async function saveCompany() {
+  try {
+    await client.put('/company', { ...companyForm })
+    ElMessage.success('已保存')
+    companyDialog.value = false
+    load()
+  } catch (e: any) {
+    ElMessage.error(e.message)
+  }
 }
 
 async function create() {
@@ -161,7 +206,10 @@ async function create() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadCompany()
+})
 </script>
 
 <style scoped>

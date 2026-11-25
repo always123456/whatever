@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import auth, jobs, matching, resumes
+from .api import auth, companies, jobs, matching, resumes
 from .db import init_db
 from .services.seed import seed_if_empty
 
@@ -32,6 +32,7 @@ def health():
 
 
 app.include_router(auth.router, prefix="/api")
+app.include_router(companies.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
 app.include_router(resumes.router, prefix="/api")
 app.include_router(matching.router, prefix="/api")

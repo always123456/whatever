@@ -1,3 +1,3 @@
-from .db_models import Job, Resume, User
+from .db_models import Company, Job, MatchRecord, RequirementCardRecord, Resume, User
 
-__all__ = ["User", "Job", "Resume"]
+__all__ = ["User", "Company", "Job", "Resume", "RequirementCardRecord", "MatchRecord"]

@@ -1,3 +1,5 @@
+import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -25,35 +27,11 @@ def get_db():
 
 
 def init_db():
+    """用 alembic 迁移到最新（PostgreSQL 正式迁移；不再 create_all + SQLite 补列）。"""
+    from alembic import command
+    from alembic.config import Config
+
     from . import models  # noqa: F401  确保模型已注册
 
-    Base.metadata.create_all(bind=engine)
-    _migrate_sqlite()
-
-
-def _migrate_sqlite():
-    """MVP 轻量补列：SQLite 建表后新增字段用 ALTER TABLE 幂等补上（不引 alembic）。"""
-    if not settings.database_url.startswith("sqlite"):
-        return
-    adds = {
-        "jobs": [
-            ("must_skills", "JSON"),
-            ("job_types", "JSON"),
-            ("company_size", "VARCHAR(32)"),
-            ("overtime", "VARCHAR(32)"),
-            ("social_insurance", "VARCHAR(32)"),
-            ("ideal_talents", "JSON"),
-        ],
-        "resumes": [
-            ("job_status", "VARCHAR(16)"),
-            ("intended_titles", "JSON"),
-            ("target_job_types", "JSON"),
-            ("self_traits", "JSON"),
-        ],
-    }
-    with engine.begin() as conn:
-        for table, cols in adds.items():
-            have = {r[1] for r in conn.exec_driver_sql(f'PRAGMA table_info("{table}")')}
-            for name, typ in cols:
-                if name not in have:
-                    conn.exec_driver_sql(f'ALTER TABLE "{table}" ADD COLUMN {name} {typ}')
+    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    command.upgrade(Config(os.path.join(backend_dir, "alembic.ini")), "head")

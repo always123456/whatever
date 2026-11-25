@@ -1,9 +1,9 @@
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..config import settings
 from ..matching.engine import match as engine_match
-from ..models.db_models import Job, Resume, User
+from ..models.db_models import Job, MatchRecord, RequirementCardRecord, Resume, User
 from ..schemas.matching import MatchItem, MatchResult
 from ..schemas.requirement import (
     HardConstraint,
@@ -17,7 +17,8 @@ AVAILABILITY_RANK = {"随时到岗": 0, "本月到岗": 1, "观望了解": 2}
 
 
 def job_to_card(job: Job) -> RequirementCard:
-    """岗位 ORM → 企业需求卡。ideal_talents 是 [{dimension,value,importance}] 列表。"""
+    """岗位 ORM → 企业需求卡。公司级字段取自 job.company（companies 表）。"""
+    company = job.company
     return RequirementCard(
         id=job.id,
         role="enterprise",
@@ -38,12 +39,13 @@ def job_to_card(job: Job) -> RequirementCard:
             traits=[TraitItem(**t) for t in (job.ideal_talents or [])],
         ),
         facts={
-            "company_name": job.company,
-            "industry": job.industry,
-            "company_size": job.company_size or "",
-            "overtime": job.overtime or "",
-            "social_insurance": job.social_insurance or "",
-            "company_traits": {},  # 6 轴数据 MVP 未采集，打分走中性降级
+            "company_name": company.name if company else "",
+            "company_abbr": company.abbr if company else "",
+            "company_size": company.size if company else "",
+            "industry": job.industry or (company.industry if company else ""),
+            "overtime": company.overtime if company else "",
+            "social_insurance": company.social_insurance if company else "",
+            "company_traits": (company.company_traits or {}) if company else {},
         },
         source="form",
         raw_text=job.description,
@@ -79,6 +81,37 @@ def resume_to_card(r: Resume) -> RequirementCard:
         source="form",
         raw_text=r.summary,
     )
+
+
+def upsert_card(db: Session, role: str, ref_id: int, card: RequirementCard, source: str = "form") -> None:
+    """写路径统一落卡。表单更新时保留卡里已有 facts（Agent 抽取字段不被表单覆盖）。"""
+    row = db.query(RequirementCardRecord).filter_by(role=role, ref_id=ref_id).first()
+    if row is None:
+        row = RequirementCardRecord(role=role, ref_id=ref_id, source=source)
+        db.add(row)
+    else:
+        try:
+            existing = RequirementCard.model_validate(row.card) if row.card else None
+            if existing is not None and existing.facts:
+                card.facts = {**existing.facts, **card.facts}
+        except Exception:
+            pass
+    card.id = ref_id  # 回填实体主键，匹配结果 candidate_id 用
+    row.card = card.model_dump(mode="json")
+    row.raw_text = card.raw_text
+    row.source = source
+    db.flush()
+
+
+def get_card(db: Session, role: str, ref_id: int, fallback: RequirementCard) -> RequirementCard:
+    """优先读落库卡（含 Agent 抽取的 facts），无卡则用表单派生的 fallback。"""
+    row = db.query(RequirementCardRecord).filter_by(role=role, ref_id=ref_id).first()
+    if row and row.card:
+        try:
+            return RequirementCard.model_validate(row.card)
+        except Exception:
+            pass
+    return fallback
 
 
 def _fmt_salary(card: RequirementCard) -> str:
@@ -144,12 +177,18 @@ def match(db: Session, user: User, req) -> MatchResult:
 
     if direction == "seeker_to_jobs":
         resume = _target_for_seeker(db, user, req.target_id)
-        target = resume_to_card(resume)
-        candidates = [job_to_card(j) for j in db.query(Job).all()]
+        target = get_card(db, "seeker", resume.id, resume_to_card(resume))
+        candidates = [
+            get_card(db, "enterprise", j.id, job_to_card(j))
+            for j in db.query(Job).options(selectinload(Job.company)).all()
+        ]
     else:
         job = _target_for_enterprise(db, user, req.target_id)
-        target = job_to_card(job)
-        candidates = [resume_to_card(r) for r in db.query(Resume).all()]
+        target = get_card(db, "enterprise", job.id, job_to_card(job))
+        candidates = [
+            get_card(db, "seeker", r.id, resume_to_card(r))
+            for r in db.query(Resume).all()
+        ]
 
     # 决策3：企业端按求职状态筛选（不进打分）
     if direction == "enterprise_to_seekers" and req.availability:
@@ -163,6 +202,23 @@ def match(db: Session, user: User, req) -> MatchResult:
             results,
             key=lambda x: (-x[1], AVAILABILITY_RANK.get(x[0].hard.job_status or "", 2)),
         )
+
+    # 落匹配记录：快照目标卡，历史分数不因卡后续变化而漂移
+    target_dump = target.model_dump(mode="json")
+    for cand, score, rules, reasons in results:
+        db.add(MatchRecord(
+            user_id=user.id,
+            direction=direction,
+            target_role=target.role,
+            target_id=target.id,
+            target_card=target_dump,
+            candidate_role=cand.role,
+            candidate_id=cand.id,
+            score=score,
+            matched_rules=rules,
+            reasons=reasons,
+        ))
+    db.commit()
 
     items = [
         MatchItem(
