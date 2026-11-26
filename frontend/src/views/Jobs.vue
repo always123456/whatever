@@ -22,8 +22,9 @@
       <el-table-column label="远程">
         <template #default="{ row }">{{ row.remote ? '支持' : '—' }}</template>
       </el-table-column>
-      <el-table-column v-if="!auth.isEnterprise" label="操作" width="120">
+      <el-table-column v-if="!auth.isEnterprise" label="操作" width="200">
         <template #default="{ row }">
+          <el-button size="small" @click="showDetail(row)">详情</el-button>
           <el-button
             size="small"
             :type="appliedJobIds.has(row.id) ? 'info' : 'primary'"
@@ -35,6 +36,125 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <el-dialog v-model="detailVisible" :title="detail ? `职位详情 · ${detail.job.title}` : '职位详情'" width="780px" top="3vh">
+      <div v-loading="detailLoading" style="max-height: 72vh; overflow-y: auto; padding-right: 4px">
+        <template v-if="detail">
+          <el-tabs>
+            <el-tab-pane label="岗位详情">
+              <el-descriptions :column="2" border>
+                <el-descriptions-item label="公司">{{ detail.job.company_name || '—' }}</el-descriptions-item>
+                <el-descriptions-item label="职位">{{ detail.job.title }}</el-descriptions-item>
+                <el-descriptions-item label="地点">{{ detail.job.location }}</el-descriptions-item>
+                <el-descriptions-item label="薪资">{{ salary(detail.job) }}</el-descriptions-item>
+                <el-descriptions-item label="学历要求">{{ detail.job.education }}</el-descriptions-item>
+                <el-descriptions-item label="经验要求">{{ detail.job.experience_years }} 年</el-descriptions-item>
+                <el-descriptions-item label="行业">{{ detail.job.industry || '—' }}</el-descriptions-item>
+                <el-descriptions-item label="岗位类型">{{ (detail.job.job_types || []).join('、') || '—' }}</el-descriptions-item>
+                <el-descriptions-item label="技能">{{ (detail.job.skills || []).join('、') || '—' }}</el-descriptions-item>
+                <el-descriptions-item label="必备技能">{{ (detail.job.must_skills || []).join('、') || '—' }}</el-descriptions-item>
+                <el-descriptions-item label="远程">{{ detail.job.remote ? '支持' : '不支持' }}</el-descriptions-item>
+                <el-descriptions-item label="状态">{{ detail.job.status === 'active' ? '招聘中' : '已关闭' }}</el-descriptions-item>
+                <el-descriptions-item label="职位描述" :span="2">{{ detail.job.description || '—' }}</el-descriptions-item>
+              </el-descriptions>
+              <h4 class="section-title">公司情况</h4>
+              <el-descriptions v-if="detail.company" :column="2" border>
+                <el-descriptions-item label="规模">{{ detail.company.size || '—' }}</el-descriptions-item>
+                <el-descriptions-item label="行业">{{ detail.company.industry || '—' }}</el-descriptions-item>
+                <el-descriptions-item label="加班节奏">{{ detail.company.overtime || '—' }}</el-descriptions-item>
+                <el-descriptions-item label="社保公积金">{{ detail.company.social_insurance || '—' }}</el-descriptions-item>
+              </el-descriptions>
+              <p v-else class="sub">该公司暂未填写档案</p>
+              <div v-if="companyTraitEntries(detail.company).length" class="traits">
+                <el-tag v-for="(v, k) in companyTraitEntries(detail.company)" :key="k" size="small" style="margin: 2px">
+                  {{ k }}：{{ v }}
+                </el-tag>
+              </div>
+            </el-tab-pane>
+            <el-tab-pane label="匹配度分析">
+              <div v-if="!detail.match || !detail.match.resume_id" class="empty">
+                你还没有简历，去「简历」页创建一份后，即可查看与该岗位的匹配度。
+              </div>
+              <template v-else>
+                <p class="sub">分析对象：你的简历「{{ detail.match.resume_name }}」</p>
+                <div v-if="detail.match.hard_passed">
+                  <div class="score">{{ (detail.match.score * 100).toFixed(1) }}<span class="pct">%</span></div>
+                  <el-tag v-for="r in detail.match.matched_rules" :key="r" size="small" type="success" style="margin: 2px">{{ r }}</el-tag>
+                  <div class="reasons">
+                    <div v-for="r in detail.match.reasons" :key="r" class="sub">· {{ r }}</div>
+                  </div>
+                </div>
+                <div v-else>
+                  <el-alert title="硬条件未通过，未进入打分" type="warning" :closable="false" style="margin-bottom: 8px" />
+                  <el-tag v-for="r in detail.match.matched_rules" :key="r" size="small" type="success" style="margin: 2px">{{ r }}</el-tag>
+                  <el-tag v-for="r in detail.match.failed_rules" :key="r" size="small" type="danger" style="margin: 2px">{{ r }}</el-tag>
+                </div>
+              </template>
+            </el-tab-pane>
+            <el-tab-pane label="简历进度">
+              <template v-if="detail.application">
+                <el-alert
+                  v-if="detail.application.status === '拒绝'"
+                  title="很遗憾，该职位申请未通过"
+                  type="error"
+                  :closable="false"
+                  style="margin-bottom: 12px"
+                />
+                <el-steps
+                  v-else
+                  :active="STATUS_STEP[detail.application.status] ?? 0"
+                  :finish-status="detail.application.status === '录用' ? 'success' : 'process'"
+                  align-center
+                  style="margin: 16px 0"
+                >
+                  <el-step v-for="s in APPLICATION_STEP_STATUSES" :key="s" :title="s" />
+                </el-steps>
+                <el-descriptions :column="2" border>
+                  <el-descriptions-item label="当前状态">{{ detail.application.status }}</el-descriptions-item>
+                  <el-descriptions-item label="投递时间">{{ fmtTime(detail.application.created_at) }}</el-descriptions-item>
+                  <el-descriptions-item label="更新时间">{{ fmtTime(detail.application.updated_at) }}</el-descriptions-item>
+                </el-descriptions>
+                <div v-if="CONFIRMABLE_STATUSES.includes(detail.application.status)" class="confirm-box">
+                  <template v-if="isConfirmed(detail.application)">
+                    <el-tag type="success" size="small">
+                      {{ detail.application.status === '面试' ? '已确认参加面试' : '已确认入职' }}
+                    </el-tag>
+                  </template>
+                  <template v-else>
+                    <span class="sub">企业已发出{{ detail.application.status === '面试' ? '面试邀约' : '录用通知' }}，请确认：</span>
+                    <el-button size="small" type="primary" @click="confirmSeeker">
+                      {{ detail.application.status === '面试' ? '确认参加面试' : '确认入职' }}
+                    </el-button>
+                  </template>
+                </div>
+                <h4 class="section-title">状态时间线</h4>
+                <el-timeline v-if="(detail.application.events || []).length">
+                  <el-timeline-item
+                    v-for="ev in detail.application.events"
+                    :key="ev.id"
+                    :timestamp="fmtTime(ev.created_at)"
+                    :type="ev.to_status === '拒绝' ? 'danger' : ev.to_status === '录用' ? 'success' : 'primary'"
+                  >
+                    <el-tag size="small" :type="STATUS_TAG[ev.to_status] || 'info'">{{ ev.to_status }}</el-tag>
+                    <span v-if="ev.note" class="sub" style="margin-left: 6px">{{ ev.note }}</span>
+                    <div class="sub">操作人：{{ ev.operator_name || '—' }}</div>
+                  </el-timeline-item>
+                </el-timeline>
+                <p v-else class="sub">暂无流转记录</p>
+              </template>
+              <div v-else class="empty">
+                尚未投递该职位
+                <el-button type="primary" size="small" style="margin-left: 8px" @click="applyDetail">立即投递</el-button>
+              </div>
+            </el-tab-pane>
+          </el-tabs>
+        </template>
+      </div>
+      <template #footer>
+        <el-button @click="detailVisible = false">关闭</el-button>
+        <el-button v-if="detail && !detail.application" type="primary" @click="applyDetail">投递</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="dialog" title="发布职位" width="640px">
       <el-form label-width="100px">
@@ -115,6 +235,7 @@ import { ElMessage } from 'element-plus'
 import client from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import CompanyTraitsForm from '../components/CompanyTraitsForm.vue'
+import { AXES } from '../components/companyTraitsAxes'
 
 const auth = useAuthStore()
 const jobs = ref<any[]>([])
@@ -122,6 +243,26 @@ const dialog = ref(false)
 const skillsText = ref('')
 const mustSkillsText = ref('')
 const appliedJobIds = ref<Set<number>>(new Set())
+
+// 职位详情弹窗
+const detailVisible = ref(false)
+const detailLoading = ref(false)
+const detail = ref<any>(null)
+
+// 投递状态枚举与后端 schemas/application.py APPLICATION_STATUSES 一致；
+// 步骤条展示 待处理→已查看→面试→录用，拒绝单独提示
+const APPLICATION_STEP_STATUSES = ['待处理', '已查看', '面试', '录用']
+const STATUS_STEP: Record<string, number> = { 待处理: 0, 已查看: 1, 面试: 2, 录用: 3 }
+const STATUS_TAG: Record<string, string> = {
+  待处理: 'info',
+  已查看: 'warning',
+  面试: 'primary',
+  录用: 'success',
+  拒绝: 'danger',
+}
+
+// 求职者可确认的状态档位（与后端 SEEKER_CONFIRMABLE 一致）
+const CONFIRMABLE_STATUSES = ['面试', '录用']
 
 // 枚举与后端 schemas/requirement.py 常量保持一致
 const JOB_TYPES = ['社招', '应届校招', '实习生', '兼职']
@@ -199,17 +340,76 @@ async function apply(row: any) {
   }
 }
 
+async function showDetail(row: any) {
+  detailVisible.value = true
+  detailLoading.value = true
+  try {
+    const { data } = await client.get(`/jobs/${row.id}/detail`)
+    detail.value = data
+  } catch (e: any) {
+    ElMessage.error(e.message)
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+async function applyDetail() {
+  if (!detail.value) return
+  await apply(detail.value.job)
+  await showDetail(detail.value.job) // 刷新：投递状态与进度
+}
+
+function isConfirmed(app: any) {
+  return (app.seeker_confirmed_statuses || []).includes(app.status)
+}
+
+async function confirmSeeker() {
+  if (!detail.value?.application) return
+  const appId = detail.value.application.id
+  const isInterview = detail.value.application.status === '面试'
+  try {
+    const { data } = await client.post(`/applications/${appId}/confirm`, {})
+    detail.value = { ...detail.value, application: data }
+    ElMessage.success(isInterview ? '已确认参加面试' : '已确认入职')
+  } catch (e: any) {
+    ElMessage.error(e.message)
+  }
+}
+
+function fmtTime(s: string) {
+  if (!s) return '—'
+  return new Date(s).toLocaleString('zh-CN')
+}
+
+function companyTraitEntries(company: any): Record<string, string> {
+  const out: Record<string, string> = {}
+  const traits = company?.company_traits || {}
+  for (const axis of AXES) {
+    const obj = traits[axis.id]
+    if (!obj) continue
+    for (const f of axis.fields) {
+      const v = obj[f.key]
+      if (v !== undefined && v !== null && v !== '') out[`${axis.name}·${f.label}`] = String(v)
+    }
+  }
+  return out
+}
+
 async function loadCompany() {
   if (!auth.isEnterprise) return
   try {
     const { data } = await client.get('/company')
     Object.assign(companyForm, data)
+    auth.company = data // 保持登录态里的公司档案与服务器同步
   } catch (e: any) {
     ElMessage.error(e.message)
   }
 }
 
 function openCompany() {
+  // 登录时已把公司档案拉进 store，先预填再向服务器刷新
+  if (auth.company) Object.assign(companyForm, auth.company)
+  loadCompany()
   companyDialog.value = true
 }
 
@@ -267,5 +467,39 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.section-title {
+  margin: 16px 0 8px;
+}
+.sub {
+  color: #909399;
+  font-size: 12px;
+}
+.empty {
+  color: #909399;
+  padding: 24px;
+  text-align: center;
+}
+.score {
+  font-size: 32px;
+  font-weight: 600;
+  color: #67c23a;
+  margin-bottom: 8px;
+}
+.pct {
+  font-size: 16px;
+  margin-left: 2px;
+}
+.reasons {
+  margin-top: 12px;
+}
+.traits {
+  margin-top: 8px;
+}
+.confirm-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
 }
 </style>

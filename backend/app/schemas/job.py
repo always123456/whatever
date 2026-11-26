@@ -3,6 +3,9 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from .application import ApplicationDetailOut
+from .company import CompanyOut
+
 
 class IdealTalent(BaseModel):
     """理想人才特质：dimension 取 schemas/requirement.py TALENT_TRAITS 的 id。
@@ -43,3 +46,24 @@ class JobOut(JobCreate):
     status: str = "active"
     created_at: datetime
     updated_at: datetime
+
+
+class MatchAnalysis(BaseModel):
+    """求职者简历 vs 单个岗位的匹配度分析（详情页实时计算，不落 match_records）。"""
+
+    resume_id: Optional[int] = None   # 分析所用简历；无简历时为 None
+    resume_name: Optional[str] = None
+    hard_passed: bool                 # 硬条件是否全部通过
+    score: Optional[float] = None     # 0-1；硬条件不通过时为 None
+    matched_rules: List[str] = []     # 通过的硬条件（如「薪资匹配」）
+    failed_rules: List[str] = []      # 未通过的硬条件（如「学历不达标」）
+    reasons: List[str] = []           # 软打分维度明细
+
+
+class JobDetailOut(BaseModel):
+    """职位详情：岗位 + 公司档案 + 匹配度分析（求职者）+ 投递进度（求职者）。"""
+
+    job: JobOut
+    company: Optional[CompanyOut] = None
+    match: Optional[MatchAnalysis] = None
+    application: Optional[ApplicationDetailOut] = None  # 含状态时间线

@@ -6,6 +6,7 @@
         <el-menu-item index="/match">智能匹配</el-menu-item>
         <el-menu-item index="/jobs">职位</el-menu-item>
         <el-menu-item index="/resumes">简历</el-menu-item>
+        <el-menu-item v-if="auth.isEnterprise" index="/applications">投递管理</el-menu-item>
         <el-menu-item index="/requirement">需求卡抽取</el-menu-item>
       </el-menu>
       <div class="right">
@@ -23,6 +24,7 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 
@@ -33,6 +35,11 @@ function logout() {
   auth.logout()
   router.push('/login')
 }
+
+onMounted(() => {
+  // 企业账号刷新页面时（登录动作不在本页发生），补拉公司档案
+  if (auth.isEnterprise) auth.fetchCompany()
+})
 </script>
 
 <style>

@@ -62,6 +62,8 @@ async function submit() {
         display_name: form.display_name,
       })
     }
+    // 企业账号登录后立即加载公司档案（公司信息表单预填来源）
+    if (auth.isEnterprise) await auth.fetchCompany()
     ElMessage.success('欢迎')
     router.push('/match')
   } catch (e: any) {

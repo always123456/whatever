@@ -12,6 +12,7 @@ export const useAuthStore = defineStore('auth', {
   state: () => ({
     token: localStorage.getItem('token') || '',
     user: JSON.parse(localStorage.getItem('user') || 'null') as User | null,
+    company: null as any, // 企业账号的公司档案（登录/刷新后加载，供各处预填）
   }),
   getters: {
     isLoggedIn: (s) => !!s.token,
@@ -39,9 +40,21 @@ export const useAuthStore = defineStore('auth', {
       localStorage.setItem('token', data.access_token)
       localStorage.setItem('user', JSON.stringify(data.user))
     },
+    async fetchCompany() {
+      // 企业账号登录后加载公司档案；失败不阻塞登录流程
+      if (!this.isEnterprise) return null
+      try {
+        const { data } = await client.get('/company')
+        this.company = data
+        return data
+      } catch {
+        return null
+      }
+    },
     logout() {
       this.token = ''
       this.user = null
+      this.company = null
       localStorage.removeItem('token')
       localStorage.removeItem('user')
     },

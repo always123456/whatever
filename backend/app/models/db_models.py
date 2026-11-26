@@ -135,6 +135,22 @@ class Application(Base):
     )
 
 
+class ApplicationEvent(Base):
+    """投递状态流转事件（时间线）：投递时由求职者写首条（''→待处理），审批流转由企业写。"""
+
+    __tablename__ = "application_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    application_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("applications.id"), index=True
+    )
+    from_status: Mapped[str] = mapped_column(String(16), default="")   # '' 表示初始投递
+    to_status: Mapped[str] = mapped_column(String(16))                 # 待处理|已查看|面试|录用|拒绝
+    operator_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)   # 审批备注（如邀约说明）
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class RequirementCardRecord(Base):
     """需求卡落库：role + ref_id 指向 job/resume，card 存完整 hard/soft/facts。"""
 
