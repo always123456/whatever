@@ -151,6 +151,27 @@ class ApplicationEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class JobReview(Base):
+    """社区评价：求职者对某岗位的评分与评价，防止岗位信息注水虚标、还原真实透明度。
+
+    一人对同一岗位仅一条评价（可修改/删除）。评分 1-5，可匿名展示。
+    """
+
+    __tablename__ = "job_reviews"
+    __table_args__ = (UniqueConstraint("job_id", "reviewer_id", name="uq_job_review_reviewer"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_id: Mapped[int] = mapped_column(Integer, ForeignKey("jobs.id"), index=True)
+    reviewer_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
+    rating: Mapped[int] = mapped_column(Integer)                     # 总体评分 1-5
+    content: Mapped[str] = mapped_column(Text, default="")           # 文字评价（可空）
+    anonymous: Mapped[bool] = mapped_column(Boolean, default=False)  # 匿名展示
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+
 class RequirementCardRecord(Base):
     """需求卡落库：role + ref_id 指向 job/resume，card 存完整 hard/soft/facts。"""
 

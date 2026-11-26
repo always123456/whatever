@@ -9,6 +9,7 @@ const router = createRouter({
     { path: '/jobs', component: () => import('../views/Jobs.vue') },
     { path: '/resumes', component: () => import('../views/Resumes.vue') },
     { path: '/applications', component: () => import('../views/Applications.vue') },
+    { path: '/community', component: () => import('../views/Community.vue') },
     { path: '/requirement', component: () => import('../views/Requirement.vue') },
   ],
 })

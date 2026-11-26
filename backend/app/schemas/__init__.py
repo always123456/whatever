@@ -10,6 +10,7 @@ from .requirement import (
     TraitItem,
 )
 from .resume import ResumeCreate, ResumeOut
+from .review import ReviewCreate, ReviewListOut, ReviewOut, ReviewStats, ReviewUpdate
 from .user import LoginIn, Token, UserCreate, UserOut
 
 __all__ = [
