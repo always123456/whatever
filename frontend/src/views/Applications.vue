@@ -264,12 +264,11 @@ const resumeDetailVisible = ref(false)
 const resumeDetailLoading = ref(false)
 const resumeDetail = ref<any>(null)
 
-// 人才特质 12 项，与后端 schemas/requirement.py TALENT_TRAITS 一致
+// 人才特质 9 项，与后端 schemas/requirement.py TALENT_TRAITS 一致
 const TALENT_NAMES: Record<string, string> = {
   C1: '结构化', C2: '判断力', C3: '学习迁移',
   A1: '主动性', A2: '交付', A3: '韧性',
   S1: '表达', S2: '澄清', S3: '冲突',
-  M1: '成就驱动', M2: '稳定性', M3: '价值取向',
 }
 
 function salary(row: any) {

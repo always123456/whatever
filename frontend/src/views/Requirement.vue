@@ -76,7 +76,6 @@ const TRAIT_NAMES: Record<string, string> = {
   C1: '结构化', C2: '判断力', C3: '学习迁移',
   A1: '主动性', A2: '交付', A3: '韧性',
   S1: '表达', S2: '澄清', S3: '冲突',
-  M1: '成就驱动', M2: '稳定性', M3: '价值取向',
 }
 
 const FACT_LABELS: Record<string, string> = {

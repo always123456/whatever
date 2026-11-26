@@ -89,7 +89,7 @@ def _prompt(role: str, raw_text: str) -> list[dict]:
     guide = _ROLE_FIELDS[role]
     user_msg = (
         f"{guide}\n\n"
-        f"人才特质 12 项（4 大类）：\n{_traits_desc()}\n\n"
+        f"人才特质 9 项（3 大类）：\n{_traits_desc()}\n\n"
         f"岗位事实评估 6 轴（公司特质用，key:value 结构，如 {{\"P\": {{\"busy_months\": 3}}}}）：\n{_axes_desc()}\n\n"
         f"{_OUTPUT_FORMAT}\n\n"
         f"原文：\n{raw_text}"

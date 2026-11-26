@@ -9,7 +9,7 @@
   暂不打分，但 Agent 要抽取出来，供展示、推荐语与后续扩展用。
 
 特质枚举来源：requirement.md（同目录）——
-- 人才特质 4 大类 12 项（C-A-S-M）→ TALENT_TRAITS，双方卡 soft.traits 使用；
+- 人才特质 3 大类 9 项（C-A-S）→ TALENT_TRAITS，双方卡 soft.traits 使用；
 - 岗位事实评估维度 6 轴（P-S-F-C-V-W）→ JOB_FACT_AXES，用于
   求职卡 facts.ideal_company_traits / 企业卡 facts.company_traits。
   高分/低分行为锚点仍在 requirement.md，写抽取提示词时引用。
@@ -57,8 +57,8 @@ def normalize_trait_level(value: str) -> float:
             return score
     return 0.5
 
-# 人才特质（附图1 / requirement.md）：4 大类 12 项
-# 采集来源：认知/动机靠情境题，行动靠经历，社交靠自由文本
+# 人才特质（附图1 / requirement.md）：3 大类 9 项
+# 采集来源：认知靠情境题，行动靠经历，社交靠自由文本
 TALENT_TRAITS: Dict[str, Dict[str, str]] = {
     "C1": {"name": "结构化", "category": "认知", "def": "把模糊目标拆成可执行步骤"},
     "C2": {"name": "判断力", "category": "认知", "def": "信息不全时敢做取舍并说依据"},
@@ -69,9 +69,6 @@ TALENT_TRAITS: Dict[str, Dict[str, str]] = {
     "S1": {"name": "表达", "category": "社交", "def": "把复杂说简单"},
     "S2": {"name": "澄清", "category": "社交", "def": "先确认约束再动手"},
     "S3": {"name": "冲突", "category": "社交", "def": "直面分歧不回避"},
-    "M1": {"name": "成就驱动", "category": "动机", "def": "有内部标准，不只对齐 KPI"},
-    "M2": {"name": "稳定性", "category": "动机", "def": "动机与岗位条件一致"},
-    "M3": {"name": "价值取向", "category": "动机", "def": "结果/过程、个人/团队、稳定/变化偏好"},
 }
 
 # 岗位事实评估维度（附图2 / requirement.md，P-S-F-C-V-W）：
@@ -154,7 +151,7 @@ class HardConstraint(BaseModel):
 
 
 class TraitItem(BaseModel):
-    """一条人才特质记录：dimension 取 TALENT_TRAITS 的 id（C1..M3，名字也兼容）。
+    """一条人才特质记录：dimension 取 TALENT_TRAITS 的 id（C1..S3，名字也兼容）。
 
     - 求职卡：人才特质报告（测评/自评的自身水平）
     - 企业卡：理想人才特质（期望对方达到的水平）

@@ -123,12 +123,11 @@ const intendedTitlesText = ref('')
 const JOB_STATUSES = ['随时到岗', '本月到岗', '观望了解']
 const JOB_TYPES = ['社招', '应届校招', '实习生', '兼职']
 const TRAIT_LEVELS = ['弱', '中', '强']
-// 人才特质 12 项（TALENT_TRAITS，与 Jobs.vue 一致）
+// 人才特质 9 项（TALENT_TRAITS，与 Jobs.vue 一致）
 const TRAITS = [
   { id: 'C1', name: '结构化' }, { id: 'C2', name: '判断力' }, { id: 'C3', name: '学习迁移' },
   { id: 'A1', name: '主动性' }, { id: 'A2', name: '交付' }, { id: 'A3', name: '韧性' },
   { id: 'S1', name: '表达' }, { id: 'S2', name: '澄清' }, { id: 'S3', name: '冲突' },
-  { id: 'M1', name: '成就驱动' }, { id: 'M2', name: '稳定性' }, { id: 'M3', name: '价值取向' },
 ]
 const selfTraitLevels = reactive<Record<string, string>>(
   Object.fromEntries(TRAITS.map((t) => [t.id, ''])),
