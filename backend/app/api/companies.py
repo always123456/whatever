@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -37,6 +39,26 @@ def update_company(
     company = get_or_create_company(db, user)
     for field, value in payload.model_dump().items():
         setattr(company, field, value)
+    db.commit()
+    db.refresh(company)
+    return company
+
+
+@router.post("/verify", response_model=CompanyOut)
+async def verify_company(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """资质审查（简化版）：企业上传营业执照等资质文件即通过，标记 verified。"""
+    if user.role != "enterprise":
+        raise HTTPException(403, detail="仅企业账号可提交资质审查")
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, detail="请上传资质文件")
+    company = get_or_create_company(db, user)
+    company.verified = True
+    company.verified_at = datetime.now()
     db.commit()
     db.refresh(company)
     return company

@@ -30,5 +30,7 @@ class CompanyOut(BaseModel):
     social_insurance: str
     logo_url: Optional[str] = None
     company_traits: dict
+    verified: bool = False
+    verified_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime

@@ -63,6 +63,10 @@
                 <el-descriptions-item label="行业">{{ detail.company.industry || '—' }}</el-descriptions-item>
                 <el-descriptions-item label="加班节奏">{{ detail.company.overtime || '—' }}</el-descriptions-item>
                 <el-descriptions-item label="社保公积金">{{ detail.company.social_insurance || '—' }}</el-descriptions-item>
+                <el-descriptions-item label="资质审查">
+                  <el-tag v-if="detail.company.verified" type="success" size="small">通过资质审查</el-tag>
+                  <span v-else class="sub">未认证</span>
+                </el-descriptions-item>
               </el-descriptions>
               <p v-else class="sub">该公司暂未填写档案</p>
               <div v-if="companyTraitEntries(detail.company).length" class="traits">
@@ -220,6 +224,33 @@
         <el-form-item label="公司特质">
           <CompanyTraitsForm v-model="companyForm.company_traits" />
         </el-form-item>
+        <el-form-item label="资质审查">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <el-tag v-if="companyForm.verified" type="success" size="large">通过资质审查</el-tag>
+            <template v-else>
+              <el-upload
+                :auto-upload="false"
+                :limit="1"
+                :show-file-list="false"
+                accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx"
+                :on-change="onVerifyFileChange"
+                :on-remove="onVerifyFileRemove"
+              >
+                <el-button size="small">选择资质文件</el-button>
+              </el-upload>
+              <span v-if="verifyFile" class="sub">{{ verifyFile.name }}</span>
+              <el-button
+                size="small"
+                type="primary"
+                :disabled="!verifyFile"
+                :loading="verifying"
+                @click="submitVerify"
+              >
+                上传并审查
+              </el-button>
+            </template>
+          </div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="companyDialog = false">取消</el-button>
@@ -306,6 +337,8 @@ const companyForm = reactive({
   overtime: '',
   social_insurance: '',
   company_traits: {} as Record<string, Record<string, unknown>>,
+  verified: false,
+  verified_at: null as string | null,
 })
 
 function salary(row: any) {
@@ -421,6 +454,35 @@ async function saveCompany() {
     load()
   } catch (e: any) {
     ElMessage.error(e.message)
+  }
+}
+
+// —— 资质审查（简化版）：上传资质文件即通过 ——
+const verifyFile = ref<File | null>(null)
+const verifying = ref(false)
+
+function onVerifyFileChange(uploadFile: any) {
+  verifyFile.value = uploadFile.raw ?? null
+}
+
+function onVerifyFileRemove() {
+  verifyFile.value = null
+}
+
+async function submitVerify() {
+  if (!verifyFile.value) return
+  verifying.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', verifyFile.value)
+    const { data } = await client.post('/company/verify', fd)
+    Object.assign(companyForm, data)
+    auth.company = data // 保持登录态里的公司档案与服务器同步
+    ElMessage.success('已通过资质审查')
+  } catch (e: any) {
+    ElMessage.error(e.message)
+  } finally {
+    verifying.value = false
   }
 }
 

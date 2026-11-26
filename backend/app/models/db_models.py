@@ -49,6 +49,8 @@ class Company(Base):
     social_insurance: Mapped[str] = mapped_column(String(32), default="")  # 社保公积金
     logo_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     company_traits: Mapped[dict] = mapped_column(JSON, default=dict)   # JOB_FACT_AXES 6 轴
+    verified: Mapped[bool] = mapped_column(Boolean, default=False)     # 资质审查：企业上传资质文件即通过
+    verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # 审查通过时间
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
