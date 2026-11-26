@@ -163,7 +163,7 @@ users   1 ── N match_records  （用户发起的匹配历史）
 - 学历 EDUCATION_LEVELS：不限 / 大专 / 本科 / 硕士 / 博士
 - 岗位类型 JOB_TYPES：社招 / 应届校招 / 实习生 / 兼职
 - 求职状态 JOB_STATUSES：随时到岗 / 本月到岗 / 观望了解
-- 人才特质 TALENT_TRAITS：C-A-S-M 四类 12 项（C1..M3）
+- 人才特质 TALENT_TRAITS：C-A-S 三类 9 项（C1..S3）
 - 特质档位 TRAIT_LEVELS：弱 / 中 / 强（打分映射 0 / 0.5 / 1.0）
 - 岗位事实评估 JOB_FACT_AXES：P 节奏 / S 结构 / F 反馈 / C 协作 / V 价值 / W 形态，各 3 字段
 - 企业规模 COMPANY_SIZES：1-49人 / 50-99人 / 100-499人 / 500-999人 / 1000人以上

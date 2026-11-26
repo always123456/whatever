@@ -78,14 +78,14 @@ None 一律视为通过（数据不全不误杀）。
 
 - 基础 10 个：name、location、expected_salary_min/max、education、experience_years、industry（单值）、skills、willing_remote、summary
 - 求职状态 1 个：job_status
-- 匹配新增 4 个：intended_titles（≤5）、target_job_types（多选）、self_traits（12 特质 × 弱/中/强）、ideal_company_traits（JOB_FACT_AXES 6 轴结构）
+- 匹配新增 4 个：intended_titles（≤5）、target_job_types（多选）、self_traits（9 特质 × 弱/中/强）、ideal_company_traits（JOB_FACT_AXES 6 轴结构）
 
 ### 3.2 需求卡抽取设计（llm/extract.py `_ROLE_FIELDS["seeker"]`，seeker 卡 17 组字段）
 
 - hard 7 个 + label：label=姓名、hard.location/remote/salary_min/salary_max/education/experience_years/job_status
 - soft 5 个：soft.skills、soft.industries（数组，表单是单值）、soft.intended_titles、soft.target_job_types、soft.traits（dimension 用 id 或中文名，value 弱/中/强，importance 默认 1.0）
 - facts 7 键（抽取层独有，表单没有）：is_student、certificates、work_experiences、projects、campus_roles、self_assessment、ideal_company_traits
-- 提示词附带共享上下文：12 项人才特质定义（C1-C3 认知 / A1-A3 行动 / S1-S3 社交 / M1-M3 动机）、6 轴字段规格（枚举/数值范围）；要求"缺失填 null/空，绝不编造"。
+- 提示词附带共享上下文：9 项人才特质定义（C1-C3 认知 / A1-A3 行动 / S1-S3 社交）、6 轴字段规格（枚举/数值范围）；要求"缺失填 null/空，绝不编造"。
 
 ### 3.3 两者差异
 
@@ -114,7 +114,7 @@ None 一律视为通过（数据不全不误杀）。
 ### 5.1 原文进卡（POST /api/requirement/parse → extract_card）
 
 1. role 由后端从 user.role 派生，忽略前端传值（api/requirement.py）。
-2. 拼提示词：_ROLE_FIELDS 字段清单 + 12 特质定义 + 6 轴规格 + JSON 输出格式约束 + 原文。
+2. 拼提示词：_ROLE_FIELDS 字段清单 + 9 特质定义 + 6 轴规格 + JSON 输出格式约束 + 原文。
 3. chat_json 调 DeepSeek chat/completions：response_format=json_object，temperature=0；key 读取顺序 settings.llm_api_key → 环境变量 DEEPSEEK_API_KEY → Windows 注册表 HKCU\Environment。
 4. 失败兜底（无 key / 网络 / JSON 解析 / Pydantic 校验失败）→ 只含 raw_text 的空卡 + warning，不报错中断。
 5. 校验通过后归一化：skills/must_skills 过 normalize_skills（别名表，未命中原样保留），industries 过 normalize_industry；traits 维度宽松校验（id 或中文名都收，未知进 warnings 不拒绝）。

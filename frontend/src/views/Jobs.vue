@@ -348,12 +348,11 @@ const TRAIT_LEVELS = ['弱', '中', '强']
 const COMPANY_SIZES = ['1-49人', '50-99人', '100-499人', '500-999人', '1000人以上']
 const OVERTIMES = ['不加班', '偶尔加班', '经常加班', '大小周', '996']
 const SOCIAL_INSURANCES = ['全额缴纳', '按最低基数缴纳', '无公积金', '面议']
-// 人才特质 12 项（TALENT_TRAITS）
+// 人才特质 9 项（TALENT_TRAITS）
 const TRAITS = [
   { id: 'C1', name: '结构化' }, { id: 'C2', name: '判断力' }, { id: 'C3', name: '学习迁移' },
   { id: 'A1', name: '主动性' }, { id: 'A2', name: '交付' }, { id: 'A3', name: '韧性' },
   { id: 'S1', name: '表达' }, { id: 'S2', name: '澄清' }, { id: 'S3', name: '冲突' },
-  { id: 'M1', name: '成就驱动' }, { id: 'M2', name: '稳定性' }, { id: 'M3', name: '价值取向' },
 ]
 const traitLevels = reactive<Record<string, string>>(
   Object.fromEntries(TRAITS.map((t) => [t.id, '不限'])),

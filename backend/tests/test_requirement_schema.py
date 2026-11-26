@@ -66,7 +66,7 @@ def test_parse_request_requires_text():
 
 
 def test_talent_traits_and_job_fact_axes_complete():
-    assert len(TALENT_TRAITS) == 12  # C1-C3 / A1-A3 / S1-S3 / M1-M3
+    assert len(TALENT_TRAITS) == 9  # C1-C3 / A1-A3 / S1-S3
     assert len(JOB_FACT_AXES) == 6   # P-S-F-C-V-W
     for axis in ("P", "S", "F", "C", "V", "W"):
         assert len(JOB_FACT_AXES[axis]["fields"]) == 3

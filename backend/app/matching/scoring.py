@@ -117,17 +117,21 @@ def _trait_match(enterprise_traits: list, seeker_traits: list) -> float:
     - 企业没要求（traits 空）→ 中性 0.5
     - 求职者缺某维度记录 → 该维度 0 分
     - 求职档 >= 期望档 → 1.0；差一档 → 0.5；差两档 → 0.0
+    - 已从枚举删除 / 未知的维度（如动机类 M1-M3）不参与打分，两侧一并跳过
     """
     if not enterprise_traits:
         return 0.5
-    seeker_by_dim = {
-        _trait_dimension_id(t.dimension): normalize_trait_level(t.value)
-        for t in (seeker_traits or [])
-    }
+    seeker_by_dim = {}
+    for t in (seeker_traits or []):
+        dim = _trait_dimension_id(t.dimension)
+        if dim in TALENT_TRAITS:
+            seeker_by_dim[dim] = normalize_trait_level(t.value)
     score = 0.0
     total_w = 0.0
     for t in enterprise_traits:
         dim = _trait_dimension_id(t.dimension)
+        if dim not in TALENT_TRAITS:
+            continue
         w = max(0.0, float(t.importance or 1.0))
         if w == 0.0:
             continue
