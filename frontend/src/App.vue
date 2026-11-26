@@ -7,6 +7,7 @@
         <el-menu-item index="/jobs">职位</el-menu-item>
         <el-menu-item index="/resumes">简历</el-menu-item>
         <el-menu-item v-if="auth.isEnterprise" index="/applications">投递管理</el-menu-item>
+        <el-menu-item index="/community">社区评价</el-menu-item>
         <el-menu-item index="/requirement">需求卡抽取</el-menu-item>
       </el-menu>
       <div class="right">
