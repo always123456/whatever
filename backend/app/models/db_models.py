@@ -131,6 +131,7 @@ class Application(Base):
     job_id: Mapped[int] = mapped_column(Integer, ForeignKey("jobs.id"), index=True)
     resume_id: Mapped[int] = mapped_column(Integer, ForeignKey("resumes.id"), index=True)
     status: Mapped[str] = mapped_column(String(16), default="待处理")  # 待处理|已查看|面试|录用|拒绝
+    reply_deadline_days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 回复期限（N天内需回复），投递时随机预置 3/5/7
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()

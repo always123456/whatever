@@ -60,6 +60,7 @@ import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import client from '../api/client'
 import { useAuthStore } from '../stores/auth'
+import { showDetectedToast } from '../utils/submitToast'
 
 const auth = useAuthStore()
 // 对象类型跟随账号角色，不再由用户选择
@@ -148,6 +149,7 @@ async function apply() {
   if (!card.value) return
   applying.value = true
   try {
+    if (auth.isEnterprise) await showDetectedToast()
     await client.post('/requirement/apply', {
       role: role.value,
       target_id: null, // 缺省写回当前用户最新一份简历/职位

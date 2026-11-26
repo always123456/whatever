@@ -2,6 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session, selectinload
 
 from ..config import settings
+from ..matching.constraints import hard_constraint_detail
 from ..matching.engine import match as engine_match
 from ..matching.normalize import normalize_industry, normalize_skills
 from ..models.db_models import Job, MatchRecord, RequirementCardRecord, Resume, User
@@ -220,7 +221,7 @@ def match(db: Session, user: User, req) -> MatchResult:
 
     # 落匹配记录：快照目标卡，历史分数不因卡后续变化而漂移
     target_dump = target.model_dump(mode="json")
-    for cand, score, rules, reasons in results:
+    for cand, score, rules, reasons, dimensions in results:
         db.add(MatchRecord(
             user_id=user.id,
             direction=direction,
@@ -241,9 +242,11 @@ def match(db: Session, user: User, req) -> MatchResult:
             score=score,
             matched_rules=rules,
             reasons=reasons,
+            dimensions=dimensions,
+            hard_detail=hard_constraint_detail(target, cand, direction),
             payload=_payload(cand),
         )
-        for cand, score, rules, reasons in results
+        for cand, score, rules, reasons, dimensions in results
     ]
     return MatchResult(direction=direction, results=items)
 

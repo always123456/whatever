@@ -6,8 +6,8 @@ from ..llm.extract import extract_card
 from ..llm.pdf import PdfParseError, parse_pdf_text
 from ..models.db_models import Application, Job, Resume, User
 from ..schemas.requirement import RequirementParseResponse
-from ..schemas.resume import ResumeCreate, ResumeOut
-from ..services.matching_service import resume_to_card, upsert_card
+from ..schemas.resume import ResumeCreate, ResumeDetailOut, ResumeOut
+from ..services.matching_service import get_card, resume_to_card, upsert_card
 from .deps import get_current_user
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
@@ -71,11 +71,52 @@ def list_resumes(
         .all()
     )
     by_resume: dict[int, ResumeOut] = {}
-    for resume, job, _app in rows:
+    for resume, job, app in rows:
         out = by_resume.get(resume.id)
         if out is None:
             out = ResumeOut.model_validate(resume)
+            # rows 按投递时间倒序，第一次遇到即该简历最近一次投递，取其回复期限
+            out.reply_deadline_days = app.reply_deadline_days
             by_resume[resume.id] = out
         if job.title and job.title not in out.applied_job_titles:
             out.applied_job_titles.append(job.title)
     return list(by_resume.values())
+
+
+@router.get("/{resume_id}", response_model=ResumeDetailOut)
+def get_resume(
+    resume_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """单份简历完整信息。求职者只能看自己的；企业只能看「投了本公司岗位」的简历。"""
+    resume = db.get(Resume, resume_id)
+    if resume is None:
+        raise HTTPException(404, "简历不存在")
+    if user.role == "seeker":
+        if resume.owner_id != user.id:
+            raise HTTPException(404, "简历不存在")
+    else:
+        applied = (
+            db.query(Application)
+            .join(Job, Job.id == Application.job_id)
+            .filter(Application.resume_id == resume.id, Job.owner_id == user.id)
+            .first()
+        )
+        if applied is None:
+            raise HTTPException(404, "简历不存在")
+
+    out = ResumeDetailOut.model_validate(resume)
+    if user.role == "enterprise":
+        titles = (
+            db.query(Job.title)
+            .join(Application, Application.job_id == Job.id)
+            .filter(Application.resume_id == resume.id, Job.owner_id == user.id)
+            .distinct()
+            .all()
+        )
+        out.applied_job_titles = [t[0] for t in titles if t[0]]
+    card = get_card(db, "seeker", resume.id, resume_to_card(resume))
+    out.facts = card.facts
+    out.raw_text = card.raw_text or ""
+    return out

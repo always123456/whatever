@@ -202,6 +202,10 @@
     </el-dialog>
 
     <el-dialog v-model="companyDialog" title="公司信息" width="680px">
+      <div class="company-pdf-row">
+        <el-button size="small" @click="openCompanyPdf">上传 PDF 自动提取</el-button>
+        <span class="sub">支持公司简介/营业执照等文字层 PDF，解析后自动填充表单；未识别字段保留原值</span>
+      </div>
       <el-form label-width="100px">
         <el-form-item label="公司名称"><el-input v-model="companyForm.name" /></el-form-item>
         <el-form-item label="公司简称"><el-input v-model="companyForm.abbr" /></el-form-item>
@@ -257,6 +261,48 @@
         <el-button type="primary" @click="saveCompany">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="companyPdfDialog" title="公司信息 PDF 自动提取" width="720px">
+      <template v-if="!companyPdfCard">
+        <el-upload
+          drag
+          :auto-upload="false"
+          :limit="1"
+          accept=".pdf"
+          :on-change="onCompanyPdfChange"
+          :on-remove="onCompanyPdfRemove"
+          :file-list="[]"
+        >
+          <div class="el-upload__text">将公司资料 PDF 拖到此处，或<em>点击选择</em>（仅支持文字层 PDF）</div>
+        </el-upload>
+        <div class="upload-actions">
+          <el-button type="primary" :loading="companyPdfParsing" :disabled="!companyPdfFile" @click="parseCompanyPdf">
+            解析
+          </el-button>
+        </div>
+      </template>
+      <template v-else>
+        <el-alert v-if="companyPdfWarnings.length" type="warning" :closable="false" style="margin-bottom: 12px">
+          <div v-for="w in companyPdfWarnings" :key="w">{{ w }}</div>
+        </el-alert>
+        <el-descriptions :column="2" border size="small">
+          <el-descriptions-item label="公司名称">{{ companyPdfCard.name || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="公司简称">{{ companyPdfCard.abbr || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="公司规模">{{ companyPdfCard.size || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="行业">{{ companyPdfCard.industry || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="加班节奏">{{ companyPdfCard.overtime || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="社保公积金">{{ companyPdfCard.social_insurance || '—' }}</el-descriptions-item>
+        </el-descriptions>
+        <p v-if="companyPdfCard.description" class="sub" style="margin: 10px 0 0">
+          识别到的公司简介（仅供预览，不入库）：{{ companyPdfCard.description }}
+        </p>
+        <p class="sub" style="margin: 10px 0 0">确认写入后，非空字段将覆盖表单对应值，未识别字段保留原值。</p>
+        <div class="upload-actions">
+          <el-button @click="resetCompanyPdf">重新上传</el-button>
+          <el-button type="success" :loading="companyPdfApplying" @click="applyCompanyPdf">确认写入公司信息</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -267,6 +313,7 @@ import client from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import CompanyTraitsForm from '../components/CompanyTraitsForm.vue'
 import { AXES } from '../components/companyTraitsAxes'
+import { showDetectedToast } from '../utils/submitToast'
 
 const auth = useAuthStore()
 const jobs = ref<any[]>([])
@@ -448,6 +495,7 @@ function openCompany() {
 
 async function saveCompany() {
   try {
+    await showDetectedToast()
     await client.put('/company', { ...companyForm })
     ElMessage.success('已保存')
     companyDialog.value = false
@@ -473,6 +521,7 @@ async function submitVerify() {
   if (!verifyFile.value) return
   verifying.value = true
   try {
+    await showDetectedToast()
     const fd = new FormData()
     fd.append('file', verifyFile.value)
     const { data } = await client.post('/company/verify', fd)
@@ -486,8 +535,77 @@ async function submitVerify() {
   }
 }
 
+// —— 公司信息 PDF 自动提取（两段式：解析出预览 → 确认合并写入）——
+const companyPdfDialog = ref(false)
+const companyPdfFile = ref<File | null>(null)
+const companyPdfParsing = ref(false)
+const companyPdfApplying = ref(false)
+const companyPdfCard = ref<any>(null)
+const companyPdfWarnings = ref<string[]>([])
+
+function openCompanyPdf() {
+  resetCompanyPdf()
+  companyPdfDialog.value = true
+}
+
+function resetCompanyPdf() {
+  companyPdfFile.value = null
+  companyPdfCard.value = null
+  companyPdfWarnings.value = []
+}
+
+function onCompanyPdfChange(uploadFile: any) {
+  const raw = uploadFile.raw as File
+  if (!raw.name.toLowerCase().endsWith('.pdf')) {
+    ElMessage.warning('仅支持 PDF 文件')
+    return
+  }
+  companyPdfFile.value = raw
+}
+
+function onCompanyPdfRemove() {
+  companyPdfFile.value = null
+}
+
+async function parseCompanyPdf() {
+  if (!companyPdfFile.value) return
+  companyPdfParsing.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', companyPdfFile.value)
+    const { data } = await client.post('/company/parse-pdf', fd)
+    companyPdfCard.value = data.company
+    companyPdfWarnings.value = data.warnings || []
+  } catch (e: any) {
+    ElMessage.error(e.message)
+  } finally {
+    companyPdfParsing.value = false
+  }
+}
+
+async function applyCompanyPdf() {
+  if (!companyPdfCard.value) return
+  companyPdfApplying.value = true
+  try {
+    await showDetectedToast()
+    const { data } = await client.post('/company/apply-extracted', {
+      company: companyPdfCard.value,
+    })
+    Object.assign(companyForm, data)
+    auth.company = data // 保持登录态里的公司档案与服务器同步
+    ElMessage.success('已提取并写入公司信息，请核对后保存')
+    companyPdfDialog.value = false
+    resetCompanyPdf()
+  } catch (e: any) {
+    ElMessage.error(e.message)
+  } finally {
+    companyPdfApplying.value = false
+  }
+}
+
 async function create() {
   try {
+    await showDetectedToast()
     await client.post('/jobs', {
       ...form,
       skills: skillsText.value.split(/[,，、]/).map((s) => s.trim()).filter(Boolean),
@@ -563,5 +681,17 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   margin: 12px 0;
+}
+.company-pdf-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.upload-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
 }
 </style>

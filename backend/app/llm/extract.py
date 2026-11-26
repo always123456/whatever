@@ -5,6 +5,12 @@
 - 特质维度宽松：LLM 输出中文名也兼容（unknown_trait_dimensions 转 warnings）。
 """
 from ..matching.normalize import normalize_industry, normalize_skills
+from ..schemas.company import (
+    COMPANY_OVERTIMES,
+    COMPANY_SIZES,
+    COMPANY_SOCIAL_INSURANCES,
+    CompanyExtraction,
+)
 from ..schemas.requirement import (
     JOB_FACT_AXES,
     TALENT_TRAITS,
@@ -119,3 +125,55 @@ def extract_card(role: CardRole, raw_text: str) -> tuple[RequirementCard, list[s
 
     warnings = card.unknown_trait_dimensions()
     return card, warnings
+
+
+_COMPANY_ENUM_FIELDS = {
+    "size": COMPANY_SIZES,
+    "overtime": COMPANY_OVERTIMES,
+    "social_insurance": COMPANY_SOCIAL_INSURANCES,
+}
+
+
+def extract_company_profile(raw_text: str) -> tuple[CompanyExtraction, list[str]]:
+    """公司 PDF 原文 → CompanyExtraction（公司基本信息抽取）。
+
+    与 extract_card 同风格：LLM 结构化输出 + Pydantic 校验；无 key / 失败 → 空结果兜底，
+    枚举字段不在枚举内给出 warning（保留原值，交给用户在表单确认）。
+    """
+    user_msg = (
+        "从公司资料原文（公司简介 / 营业执照 / 工商信息等）中抽取公司基本信息，仅输出一个 JSON 对象，不要任何解释：\n"
+        "{\n"
+        '  "name": "公司全称",\n'
+        '  "abbr": "公司简称",\n'
+        f'  "size": "公司规模枚举：{'/'.join(COMPANY_SIZES)}",\n'
+        '  "industry": "所属行业",\n'
+        f'  "overtime": "加班节奏枚举：{'/'.join(COMPANY_OVERTIMES)}",\n'
+        f'  "social_insurance": "社保公积金枚举：{'/'.join(COMPANY_SOCIAL_INSURANCES)}",\n'
+        '  "company_traits": "公司特质（下方 6 轴 key:value 结构，如 {\\"P\\": {\\"busy_months\\": 3}}，抽不到填 {}）",\n'
+        '  "description": "公司简介/主营业务一句话概括"\n'
+        "}\n"
+        "抽不到的字段填空字符串或 {}，不要编造。\n\n"
+        f"岗位事实评估 6 轴：\n{_axes_desc()}\n\n"
+        f"原文：\n{raw_text}"
+    )
+    messages = [
+        {"role": "system", "content": "你是企业信息的结构化抽取器，只输出 JSON，字段缺失填空，绝不编造。"},
+        {"role": "user", "content": user_msg},
+    ]
+
+    try:
+        data = chat_json(messages, temperature=0.0)
+    except LLMUnavailable:
+        return CompanyExtraction(), ["LLM 不可用（无 key 或调用失败），已返回空结果，请用表单补充"]
+
+    try:
+        ext = CompanyExtraction.model_validate(data)
+    except Exception as e:  # noqa: BLE001
+        return CompanyExtraction(), [f"抽取结果校验失败，已返回空结果：{e}"]
+
+    warnings: list[str] = []
+    for field, options in _COMPANY_ENUM_FIELDS.items():
+        v = getattr(ext, field)
+        if v and v not in options:
+            warnings.append(f"{field}「{v}」不在枚举 {'/'.join(options)} 中，请在表单确认")
+    return ext, warnings

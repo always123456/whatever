@@ -11,7 +11,7 @@ def match(
     top_n: int = 10,
     min_score: float = 0.0,
 ):
-    """返回 [(cand, score, matched_rules, reasons)]，按分数降序。
+    """返回 [(cand, score, matched_rules, reasons, dimensions)]，按分数降序。
 
     target/candidates 均为 RequirementCard；cand 保留原对象（含 id），供调用方回填候选主键。
     """
@@ -23,9 +23,9 @@ def match(
 
     scored = []
     for cand, rules in passed:
-        score, reasons = compute_score(target, cand, direction)
+        score, reasons, dimensions = compute_score(target, cand, direction)
         if score >= min_score:
-            scored.append((cand, score, rules, reasons))
+            scored.append((cand, score, rules, reasons, dimensions))
 
     scored.sort(key=lambda x: x[1], reverse=True)
     return scored[:top_n]

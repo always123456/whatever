@@ -16,6 +16,9 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   if (to.path !== '/login' && !localStorage.getItem('token')) return '/login'
+  // 简历页仅求职者使用；企业视图已合并进「投递管理」
+  const user = JSON.parse(localStorage.getItem('user') || 'null')
+  if (to.path === '/resumes' && user?.role === 'enterprise') return '/applications'
   return true
 })
 

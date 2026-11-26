@@ -1,3 +1,5 @@
+import random
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -64,7 +66,11 @@ def create_application(
     if dup is not None:
         raise HTTPException(409, detail="已投递过该职位")
 
-    app = Application(job_id=job.id, resume_id=resume.id)
+    app = Application(
+        job_id=job.id,
+        resume_id=resume.id,
+        reply_deadline_days=random.choice([3, 5, 7]),  # 随机预置回复期限，供企业端展示「N天内需回复」
+    )
     db.add(app)
     db.flush()
     log_event(db, app.id, "", "待处理", user.id)

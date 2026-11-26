@@ -33,3 +33,11 @@ class ResumeOut(ResumeCreate):
     created_at: datetime
     updated_at: datetime
     applied_job_titles: List[str] = []  # 企业视角：该简历投递的本公司岗位标题（求职者视角恒为空）
+    reply_deadline_days: Optional[int] = None  # 企业视角：最近一次投递的回复期限（N天内需回复），求职者视角恒 None
+
+
+class ResumeDetailOut(ResumeOut):
+    """单份简历完整信息：结构化列 + 需求卡 facts（如 LLM 抽取的 is_student/self_assessment）+ 抽取原文。"""
+
+    facts: dict = Field(default_factory=dict)
+    raw_text: str = ""  # 简历原始文本（PDF/原文抽取时留档），未抽取为空

@@ -71,3 +71,74 @@ def check_hard_constraints(target: RequirementCard, cand: RequirementCard, direc
         failed.append("必备技能缺失")
 
     return (len(failed) == 0, passed, failed)
+
+
+def _fmt_salary_range(card: RequirementCard) -> str:
+    """把卡片薪资区间格式化为可读字符串（单位 k）。"""
+    lo = card.hard.salary_min
+    hi = card.hard.salary_max
+    if lo is None and hi is None:
+        return "面议"
+    if lo is None:
+        return f"≤{hi:.0f}k"
+    if hi is None:
+        return f"≥{lo:.0f}k"
+    return f"{lo:.0f}-{hi:.0f}k"
+
+
+def _fmt_exp_years(years) -> str:
+    return "不限" if years is None else f"{years} 年"
+
+
+def hard_constraint_detail(target: RequirementCard, cand: RequirementCard, direction: str) -> list:
+    """结构化硬条件明细：每条含岗位要求、求职者情况、是否通过。
+
+    与 check_hard_constraints 同一套规则，供前端「查看详情」弹窗展示
+    「该岗位要求 vs 求职者具体信息」的逐条对比。
+    """
+    job, seeker = _split_direction(target, cand, direction)
+
+    loc_ok = job.hard.location == seeker.hard.location or job.hard.remote or seeker.hard.remote
+    sal_ok = _ge_or_none(job.hard.salary_max, seeker.hard.salary_min)
+    edu_ok = _edu(seeker.hard.education) >= _edu(job.hard.education)
+    exp_ok = _ge_or_none(seeker.hard.experience_years, job.hard.experience_years)
+    missing = [s for s in job.hard.must_skills if s not in set(seeker.soft.skills)]
+    skill_ok = not missing
+
+    return [
+        {
+            "key": "location",
+            "label": "地点",
+            "job_value": (job.hard.location or "不限") + ("（支持远程）" if job.hard.remote else ""),
+            "seeker_value": (seeker.hard.location or "不限") + ("（可远程）" if seeker.hard.remote else ""),
+            "passed": loc_ok,
+        },
+        {
+            "key": "salary",
+            "label": "薪资",
+            "job_value": _fmt_salary_range(job),
+            "seeker_value": _fmt_salary_range(seeker),
+            "passed": sal_ok,
+        },
+        {
+            "key": "education",
+            "label": "学历",
+            "job_value": f"最低 {job.hard.education or '不限'}",
+            "seeker_value": seeker.hard.education or "未填",
+            "passed": edu_ok,
+        },
+        {
+            "key": "experience",
+            "label": "经验",
+            "job_value": f"最低 {_fmt_exp_years(job.hard.experience_years)}",
+            "seeker_value": _fmt_exp_years(seeker.hard.experience_years),
+            "passed": exp_ok,
+        },
+        {
+            "key": "must_skills",
+            "label": "必备技能",
+            "job_value": "、".join(job.hard.must_skills) if job.hard.must_skills else "无",
+            "seeker_value": "、".join(seeker.soft.skills) if seeker.soft.skills else "未填",
+            "passed": skill_ok,
+        },
+    ]

@@ -1,11 +1,12 @@
 """投递审批服务：状态机流转 + 时间线事件 + 详情组装。
 
 状态机（与 schemas/application.py ALLOWED_TRANSITIONS 一致）：
-  待处理 -> 已查看 | 面试 | 拒绝
-  已查看 -> 面试 | 拒绝
+  待处理 -> 面试 | 拒绝（已去除「标记已查看」）
+  已查看 -> 面试 | 拒绝（存量记录）
   面试   -> 录用 | 拒绝
   录用/拒绝为终态。
 投递创建时由求职者写首条事件（'' -> 待处理），此后每次流转由企业写一条。
+拒绝须填写退回原由，邀约面试须附可面试时间（都写在事件 note）。
 """
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -60,6 +61,10 @@ def apply_transition(
     if to_status not in allowed:
         detail = f"不允许从「{app.status}」流转到「{to_status}」"
         raise HTTPException(400, detail=detail)
+    if to_status == "拒绝" and (not note or not note.strip()):
+        raise HTTPException(400, detail="退回需填写退回原由")
+    if to_status == "面试" and (not note or not note.strip()):
+        raise HTTPException(400, detail="邀约面试需附上可面试时间")
     from_status = app.status
     app.status = to_status
     log_event(db, app.id, from_status, to_status, operator.id, note)

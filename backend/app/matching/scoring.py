@@ -36,6 +36,23 @@ WEIGHTS = {
     },
 }
 
+# 维度展示名（前端评分明细进度条用）与渲染顺序
+DIMENSION_LABELS = {
+    "skill": "技能重合度",
+    "title": "职位名匹配",
+    "salary": "薪资覆盖率",
+    "industry": "行业匹配",
+    "experience": "经验富余",
+    "text": "文本相似",
+    "job_types": "岗位类型匹配度",
+    "company": "公司特质",
+    "trait": "特质匹配",
+}
+DIMENSION_ORDER = [
+    "skill", "title", "trait", "salary", "industry",
+    "experience", "text", "job_types", "company",
+]
+
 
 def _skill_overlap(a: list, b: list) -> float:
     if not a or not b:
@@ -160,7 +177,10 @@ def _card_text(card: RequirementCard) -> str:
 
 
 def compute_score(target: RequirementCard, cand: RequirementCard, direction: str):
-    """返回 (总分, 原因列表)。target=搜索者卡, cand=候选卡。"""
+    """返回 (总分, 原因列表, 维度明细列表)。target=搜索者卡, cand=候选卡。
+
+    dimensions 为 [{key, label, score}]，score 0-1，供前端进度条渲染。
+    """
     if direction == "seeker_to_jobs":
         job, seeker = cand, target
     else:
@@ -196,6 +216,12 @@ def compute_score(target: RequirementCard, cand: RequirementCard, direction: str
     wsum = sum(w[k] for k in dims)
     score = sum(w[k] * dims[k] for k in dims) / wsum if wsum else 0.0
 
+    dimensions = [
+        {"key": k, "label": DIMENSION_LABELS.get(k, k), "score": round(float(dims[k]), 4)}
+        for k in DIMENSION_ORDER
+        if k in dims
+    ]
+
     reasons = [
         f"技能重合 {dims['skill']:.2f}",
         f"薪资覆盖 {dims['salary']:.2f}",
@@ -210,4 +236,4 @@ def compute_score(target: RequirementCard, cand: RequirementCard, direction: str
     else:
         reasons.append(f"特质匹配 {dims['trait']:.2f}")
 
-    return round(score, 4), reasons
+    return round(score, 4), reasons, dimensions

@@ -91,7 +91,7 @@ def job_detail(
     job_card = get_card(db, "enterprise", job.id, job_to_card(job))
     passed, rules, failed = check_hard_constraints(seeker_card, job_card, "seeker_to_jobs")
     if passed:
-        score, reasons = compute_score(seeker_card, job_card, "seeker_to_jobs")
+        score, reasons, _ = compute_score(seeker_card, job_card, "seeker_to_jobs")
     else:
         score, reasons = None, []
     detail.match = MatchAnalysis(

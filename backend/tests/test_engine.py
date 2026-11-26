@@ -140,19 +140,24 @@ def test_scores_within_unit_range():
     jobs = [_job(id=i) for i in range(1, 4)]
     results = match(r, jobs, "seeker_to_jobs", top_n=10)
     assert results
-    for _, score, _, _ in results:
+    for _, score, _, _, _ in results:
         assert 0.0 <= score <= 1.0
 
 
 def test_compute_score_returns_reasons():
     r = _resume()
     j = _job()
-    score, reasons = compute_score(r, j, "seeker_to_jobs")
+    score, reasons, dimensions = compute_score(r, j, "seeker_to_jobs")
     assert isinstance(score, float)
     assert 0.0 <= score <= 1.0
     assert reasons
     # seeker_to_jobs 含公司特质维度
     assert any("公司特质" in s for s in reasons)
+    # 结构化维度明细：含技能重合度/薪资覆盖率/经验富余/岗位类型匹配度/文本相似
+    labels = {d["label"] for d in dimensions}
+    assert {"技能重合度", "薪资覆盖率", "经验富余", "岗位类型匹配度", "文本相似"} <= labels
+    for d in dimensions:
+        assert 0.0 <= d["score"] <= 1.0
 
 
 def test_trait_match_levels_and_weights():

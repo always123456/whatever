@@ -1,16 +1,12 @@
 <template>
   <div>
     <div class="toolbar">
-      <h3>{{ auth.isEnterprise ? '投递简历' : '简历列表' }}</h3>
-      <el-button v-if="!auth.isEnterprise" type="primary" @click="dialog = true">创建简历</el-button>
-      <el-button v-if="!auth.isEnterprise" @click="openUpload">上传简历PDF</el-button>
+      <h3>简历列表</h3>
+      <el-button type="primary" @click="dialog = true">创建简历</el-button>
+      <el-button @click="openUpload">上传简历PDF</el-button>
     </div>
-    <p v-if="auth.isEnterprise" class="tip">仅展示投递了本公司岗位的求职者简历。</p>
     <el-table :data="resumes" stripe>
       <el-table-column prop="name" label="姓名" />
-      <el-table-column v-if="auth.isEnterprise" label="投递岗位">
-        <template #default="{ row }">{{ (row.applied_job_titles || []).join('、') }}</template>
-      </el-table-column>
       <el-table-column prop="location" label="地点" />
       <el-table-column label="期望薪资">
         <template #default="{ row }">{{ salary(row) }}</template>
@@ -116,10 +112,8 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import client from '../api/client'
-import { useAuthStore } from '../stores/auth'
 import CompanyTraitsForm from '../components/CompanyTraitsForm.vue'
 
-const auth = useAuthStore()
 const resumes = ref<any[]>([])
 const dialog = ref(false)
 const skillsText = ref('')
