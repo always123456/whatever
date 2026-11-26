@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from ..db import get_db
+from ..llm.extract import extract_card
+from ..llm.pdf import PdfParseError, parse_pdf_text
 from ..models.db_models import Application, Job, Resume, User
+from ..schemas.requirement import RequirementParseResponse
 from ..schemas.resume import ResumeCreate, ResumeOut
 from ..services.matching_service import resume_to_card, upsert_card
 from .deps import get_current_user
@@ -25,6 +28,28 @@ def create_resume(
     db.commit()
     db.refresh(resume)
     return resume
+
+
+@router.post("/parse-pdf", response_model=RequirementParseResponse)
+async def parse_resume_pdf(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+):
+    """上传简历 PDF：抽取文字层文本 → 复用需求理解 Agent 抽取需求卡预览（不落库）。
+
+    两段式流程第一段：返回卡预览供校对，第二段由 /requirement/apply 合并写回。
+    """
+    if user.role != "seeker":
+        raise HTTPException(403, detail="仅求职者账号可上传简历 PDF")
+    if not (file.filename or "").lower().endswith(".pdf"):
+        raise HTTPException(400, detail="仅支持 PDF 文件")
+    data = await file.read()
+    try:
+        text = parse_pdf_text(data)
+    except PdfParseError as e:
+        raise HTTPException(422, detail=str(e))
+    card, warnings = extract_card("seeker", text)
+    return RequirementParseResponse(card=card, warnings=warnings)
 
 
 @router.get("", response_model=list[ResumeOut])

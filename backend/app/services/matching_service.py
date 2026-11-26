@@ -295,16 +295,72 @@ def _merge_cards(existing: RequirementCard, extracted: RequirementCard) -> Requi
     return merged
 
 
+def _resume_for_apply(db: Session, user: User, target_id, card: RequirementCard) -> Resume:
+    """apply 的目标简历：显式 target_id 校验归属；缺省取最新一份，没有则从抽取卡自动建一份。
+
+    PDF/原文抽取场景求职者可能尚未建简历，此时自动建档，抽取字段随后由 _sync_resume_columns 回填。
+    """
+    if target_id is not None:
+        resume = db.get(Resume, target_id)
+        if resume is None:
+            raise HTTPException(404, "简历不存在")
+        if resume.owner_id != user.id:
+            raise HTTPException(403, "只能写自己的简历")
+        return resume
+    resume = db.query(Resume).filter(Resume.owner_id == user.id).order_by(Resume.id.desc()).first()
+    if resume is None:
+        resume = Resume(
+            owner_id=user.id,
+            name=card.label or "未命名简历",
+            location=card.hard.location or "",
+        )
+        db.add(resume)
+        db.flush()
+    return resume
+
+
+def _sync_resume_columns(resume: Resume, card: RequirementCard) -> None:
+    """把合并后的需求卡回填到 resumes 表结构化列（简历列表/企业投递视角据此展示）。
+
+    merged 卡已是「表单值 + 抽取值」合并后的最终态，直接整体同步即等价于增量回填。
+    """
+    h, s, f = card.hard, card.soft, card.facts
+    if card.label:
+        resume.name = card.label
+    if h.location is not None:
+        resume.location = h.location
+    resume.expected_salary_min = h.salary_min
+    resume.expected_salary_max = h.salary_max
+    if h.education is not None:
+        resume.education = h.education
+    if h.experience_years is not None:
+        resume.experience_years = h.experience_years
+    resume.willing_remote = h.remote
+    if h.job_status is not None:
+        resume.job_status = h.job_status
+    if s.skills:
+        resume.skills = s.skills
+    if s.industries:
+        resume.industry = s.industries[0]
+    if s.intended_titles:
+        resume.intended_titles = s.intended_titles
+    if s.target_job_types:
+        resume.target_job_types = s.target_job_types
+    if s.traits:
+        resume.self_traits = [t.model_dump() for t in s.traits]
+    if f.get("self_assessment"):
+        resume.summary = f["self_assessment"]
+
+
 def apply_extracted_card(db: Session, user: User, role: str, target_id, card: RequirementCard) -> RequirementCard:
     """把抽取预览卡合并写回目标实体（简历/职位）的需求卡。校验归属：只能写自己的实体。"""
     if role == "seeker":
         if user.role != "seeker":
             raise HTTPException(403, "仅求职者可写求职卡")
-        resume = _target_for_seeker(db, user, target_id)
-        if resume.owner_id != user.id:
-            raise HTTPException(403, "只能写自己的简历")
+        resume = _resume_for_apply(db, user, target_id, card)
         existing = get_card(db, "seeker", resume.id, resume_to_card(resume))
         merged = _merge_cards(existing, card)
+        _sync_resume_columns(resume, merged)
         upsert_card(db, "seeker", resume.id, merged, source="llm")
     else:
         if user.role != "enterprise":

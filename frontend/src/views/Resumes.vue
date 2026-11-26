@@ -3,6 +3,7 @@
     <div class="toolbar">
       <h3>{{ auth.isEnterprise ? '投递简历' : '简历列表' }}</h3>
       <el-button v-if="!auth.isEnterprise" type="primary" @click="dialog = true">创建简历</el-button>
+      <el-button v-if="!auth.isEnterprise" @click="openUpload">上传简历PDF</el-button>
     </div>
     <p v-if="auth.isEnterprise" class="tip">仅展示投递了本公司岗位的求职者简历。</p>
     <el-table :data="resumes" stripe>
@@ -69,11 +70,50 @@
         <el-button type="primary" @click="create">创建</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="uploadDialog" title="上传简历 PDF 解析" width="720px">
+      <template v-if="!pdfCard">
+        <el-upload
+          drag
+          :auto-upload="false"
+          :limit="1"
+          accept=".pdf"
+          :on-change="onPdfChange"
+          :on-remove="onPdfRemove"
+          :file-list="[]"
+        >
+          <div class="el-upload__text">将简历 PDF 拖到此处，或<em>点击选择</em>（仅支持文字层 PDF）</div>
+        </el-upload>
+        <div class="upload-actions">
+          <el-button type="primary" :loading="parsing" :disabled="!pdfFile" @click="parsePdf">解析</el-button>
+        </div>
+      </template>
+      <template v-else>
+        <el-alert v-if="pdfWarnings.length" type="warning" :closable="false" style="margin-bottom: 12px">
+          <div v-for="w in pdfWarnings" :key="w">{{ w }}</div>
+        </el-alert>
+        <el-descriptions :column="2" border size="small">
+          <el-descriptions-item label="姓名">{{ pdfCard.label || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="地点">{{ pdfCard.hard?.location || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="期望薪资">{{ pdfSalary }}</el-descriptions-item>
+          <el-descriptions-item label="学历">{{ pdfCard.hard?.education || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="经验(年)">{{ pdfCard.hard?.experience_years ?? '—' }}</el-descriptions-item>
+          <el-descriptions-item label="求职状态">{{ pdfCard.hard?.job_status || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="技能">{{ (pdfCard.soft?.skills || []).join('、') || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="行业">{{ (pdfCard.soft?.industries || []).join('、') || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="意向职位">{{ (pdfCard.soft?.intended_titles || []).join('、') || '—' }}</el-descriptions-item>
+        </el-descriptions>
+        <div class="upload-actions">
+          <el-button @click="resetUpload">重新上传</el-button>
+          <el-button type="success" :loading="applying" @click="applyPdf">确认写入简历</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import client from '../api/client'
 import { useAuthStore } from '../stores/auth'
@@ -143,6 +183,80 @@ async function create() {
     load()
   } catch (e: any) {
     ElMessage.error(e.message)
+  }
+}
+
+// —— 上传 PDF 解析（两段式：解析出卡预览 → 确认写回）——
+const uploadDialog = ref(false)
+const pdfFile = ref<File | null>(null)
+const parsing = ref(false)
+const applying = ref(false)
+const pdfCard = ref<any>(null)
+const pdfWarnings = ref<string[]>([])
+
+const pdfSalary = computed(() => {
+  const lo = pdfCard.value?.hard?.salary_min
+  const hi = pdfCard.value?.hard?.salary_max
+  if (lo == null && hi == null) return '面议'
+  if (lo == null) return `≤${hi}k`
+  if (hi == null) return `≥${lo}k`
+  return `${lo}-${hi}k`
+})
+
+function onPdfChange(uploadFile: any) {
+  const raw = uploadFile.raw as File
+  if (!raw.name.toLowerCase().endsWith('.pdf')) {
+    ElMessage.warning('仅支持 PDF 文件')
+    return
+  }
+  pdfFile.value = raw
+}
+function onPdfRemove() {
+  pdfFile.value = null
+}
+function openUpload() {
+  resetUpload()
+  uploadDialog.value = true
+}
+function resetUpload() {
+  pdfFile.value = null
+  pdfCard.value = null
+  pdfWarnings.value = []
+}
+
+async function parsePdf() {
+  if (!pdfFile.value) return
+  parsing.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', pdfFile.value)
+    const { data } = await client.post('/resumes/parse-pdf', fd)
+    pdfCard.value = data.card
+    pdfWarnings.value = data.warnings || []
+  } catch (e: any) {
+    ElMessage.error(e.message)
+  } finally {
+    parsing.value = false
+  }
+}
+
+async function applyPdf() {
+  if (!pdfCard.value) return
+  applying.value = true
+  try {
+    await client.post('/requirement/apply', {
+      role: 'seeker',
+      target_id: null,
+      card: pdfCard.value,
+    })
+    ElMessage.success('已写入简历')
+    uploadDialog.value = false
+    resetUpload()
+    load()
+  } catch (e: any) {
+    ElMessage.error(e.message)
+  } finally {
+    applying.value = false
   }
 }
 
